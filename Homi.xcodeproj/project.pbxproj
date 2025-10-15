@@ -6,6 +6,15 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		CE09D6062E9CB9FE002A856A /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = CE09D6052E9CB9FE002A856A /* FirebaseAnalytics */; };
+		CE09D6082E9CB9FE002A856A /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = CE09D6072E9CB9FE002A856A /* FirebaseAuth */; };
+		CE09D60A2E9CB9FE002A856A /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = CE09D6092E9CB9FE002A856A /* FirebaseCrashlytics */; };
+		CE09D60C2E9CB9FE002A856A /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = CE09D60B2E9CB9FE002A856A /* FirebaseFirestore */; };
+		CE09D60E2E9CB9FE002A856A /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = CE09D60D2E9CB9FE002A856A /* FirebaseMessaging */; };
+		CE09D6102E9CB9FE002A856A /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = CE09D60F2E9CB9FE002A856A /* FirebaseStorage */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		CE09D5F42E9CB723002A856A /* Homi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Homi.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +32,12 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CE09D60A2E9CB9FE002A856A /* FirebaseCrashlytics in Frameworks */,
+				CE09D60C2E9CB9FE002A856A /* FirebaseFirestore in Frameworks */,
+				CE09D60E2E9CB9FE002A856A /* FirebaseMessaging in Frameworks */,
+				CE09D6062E9CB9FE002A856A /* FirebaseAnalytics in Frameworks */,
+				CE09D6082E9CB9FE002A856A /* FirebaseAuth in Frameworks */,
+				CE09D6102E9CB9FE002A856A /* FirebaseStorage in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +80,12 @@
 			);
 			name = Homi;
 			packageProductDependencies = (
+				CE09D6052E9CB9FE002A856A /* FirebaseAnalytics */,
+				CE09D6072E9CB9FE002A856A /* FirebaseAuth */,
+				CE09D6092E9CB9FE002A856A /* FirebaseCrashlytics */,
+				CE09D60B2E9CB9FE002A856A /* FirebaseFirestore */,
+				CE09D60D2E9CB9FE002A856A /* FirebaseMessaging */,
+				CE09D60F2E9CB9FE002A856A /* FirebaseStorage */,
 			);
 			productName = Homi;
 			productReference = CE09D5F42E9CB723002A856A /* Homi.app */;
@@ -94,6 +115,9 @@
 			);
 			mainGroup = CE09D5EB2E9CB723002A856A;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				CE09D6042E9CB9FE002A856A /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = CE09D5F52E9CB723002A856A /* Products */;
 			projectDirPath = "";
@@ -251,6 +275,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7WXW567MR7;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -258,6 +283,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -282,6 +308,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7WXW567MR7;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -289,6 +316,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -328,6 +356,50 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		CE09D6042E9CB9FE002A856A /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.4.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		CE09D6052E9CB9FE002A856A /* FirebaseAnalytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CE09D6042E9CB9FE002A856A /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalytics;
+		};
+		CE09D6072E9CB9FE002A856A /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CE09D6042E9CB9FE002A856A /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		CE09D6092E9CB9FE002A856A /* FirebaseCrashlytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CE09D6042E9CB9FE002A856A /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCrashlytics;
+		};
+		CE09D60B2E9CB9FE002A856A /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CE09D6042E9CB9FE002A856A /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+		CE09D60D2E9CB9FE002A856A /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CE09D6042E9CB9FE002A856A /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseMessaging;
+		};
+		CE09D60F2E9CB9FE002A856A /* FirebaseStorage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CE09D6042E9CB9FE002A856A /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseStorage;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = CE09D5EC2E9CB723002A856A /* Project object */;
 }

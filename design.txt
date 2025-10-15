@@ -1,0 +1,831 @@
+# Homi - iOS App Design Document
+
+## How to Use This Document with Claude Code
+
+**Recommended Approach:**
+1. Save this document as `design.txt` in your project folder
+2. Use Claude Code in **Agent Mode** for best results
+3. Start with this prompt:
+
+```
+Please read the design.txt file and build the Homi iOS app following the phases outlined. Start with Phase 1 (Authentication) and create a fully working implementation before moving to the next phase. 
+
+Use SwiftUI, Firebase, and follow iOS best practices. Ask me if you need any clarification, API keys, or when you're ready to move to the next phase.
+```
+
+## Implementation Instructions for Claude Code
+
+**IMPORTANT: This is a large project. Build in phases using agent mode. Each phase should be fully functional before moving to the next.**
+
+## Quick Start Requirements
+- Xcode 15+
+- iOS 17.0+ deployment target  
+- Swift 5.9
+- SwiftUI only (no UIKit)
+- Firebase SDK
+- MVVM architecture pattern
+
+## Phase 1: Project Setup & Authentication (Build This First)
+
+### 1.1 Initial Setup Tasks
+1. Create new iOS app in Xcode named "Homi"
+2. Add Firebase SDK via Swift Package Manager
+3. Create Firebase project with:
+   - Authentication (Email, Phone, Google, Apple)
+   - Firestore Database
+   - Storage
+4. Add GoogleService-Info.plist
+5. Configure URL schemes for Google Sign-In
+6. Add Sign in with Apple capability
+
+### 1.2 Project Structure
+```
+Homi/
+├── App/
+│   ├── HomiApp.swift
+│   └── AppDelegate.swift (for Firebase config)
+├── Models/
+│   ├── User.swift
+│   └── House.swift
+├── Views/
+│   ├── Auth/
+│   │   ├── WelcomeView.swift
+│   │   ├── AuthOptionsView.swift
+│   │   ├── PhoneAuthView.swift
+│   │   └── EmailSignUpView.swift
+│   ├── House/
+│   └── Main/
+│       └── ContentView.swift
+├── ViewModels/
+│   └── AuthViewModel.swift
+├── Services/
+│   ├── AuthService.swift
+│   └── FirestoreService.swift
+└── Utilities/
+    ├── Extensions/
+    └── Constants.swift
+```
+
+### 1.3 Build These Screens First
+1. **WelcomeView**: Logo + "Get Started" button
+2. **AuthOptionsView**: 4 authentication method buttons
+3. **PhoneAuthView**: Phone input + OTP verification
+4. **EmailSignUpView**: Email/password form
+5. **ProfileSetupView**: Name + optional photo
+
+### 1.4 Core Services to Implement
+```swift
+// AuthService.swift - Key methods needed:
+- signInWithApple()
+- signInWithGoogle()
+- signInWithPhone(phoneNumber: String)
+- signInWithEmail(email: String, password: String)
+- createUserProfile(user: User)
+- logout()
+
+// FirestoreService.swift - Start with:
+- createUser(user: User)
+- getUser(id: String) -> User?
+```
+
+## Phase 2: House Management (Build After Auth Works)
+
+### 2.1 Additional Models
+```swift
+struct House: Codable {
+    let id: String
+    let name: String
+    let inviteCode: String
+    let createdBy: String
+    let memberIds: [String]
+    let createdAt: Timestamp
+}
+```
+
+### 2.2 New Screens
+1. **CreateOrJoinView**: Two large buttons
+2. **CreateHouseView**: Name input + create
+3. **JoinHouseView**: Invite code input
+4. **HouseSetupCompleteView**: Success + show invite code
+
+### 2.3 Required Functionality
+- Generate 6-character invite codes
+- Validate invite codes
+- Add user to house member list
+- Update user's currentHouseId
+
+## Phase 3: Tab Navigation & Dashboard
+
+### 3.1 Tab Structure
+```swift
+TabView {
+    DashboardView().tabItem { Label("Home", systemImage: "house") }
+    MessagesView().tabItem { Label("Chat", systemImage: "message") }
+    ExpensesView().tabItem { Label("Bills", systemImage: "dollarsign.circle") }
+    LocationView().tabItem { Label("Location", systemImage: "location") }
+    ChoresView().tabItem { Label("Chores", systemImage: "checklist") }
+}
+```
+
+### 3.2 Dashboard Components
+- House name header
+- Member avatars row
+- Quick stats cards
+- Recent activity list
+
+## 1. App Overview
+
+**App Name:** Homi  
+**Platform:** iOS (Swift)  
+**Purpose:** A comprehensive roommate management app that helps housemates coordinate living together through messaging, expense tracking, location sharing, and chore management.
+
+## 2. Core Features
+
+### 2.1 Authentication System
+- **Sign Up Methods:**
+  - Apple Sign-In (required for iOS apps with social login)
+  - Google Sign-In
+  - Email/Password
+  - Phone Number (SMS verification)
+- **Login Options:** All sign-up methods available for login
+- **Account Linking:** Users can link multiple auth methods to one account
+- **Password Recovery:** Via email (for email/password users)
+- **Profile Management:** Edit name, photo, contact info, linked accounts
+
+### 2.2 House Management
+- **Create House:** Set house name, address, invite code generation
+- **Join House:** Enter invite code or accept invitation link
+- **House Settings:** Edit house details, manage members, leave house
+- **Member Roles:** House admin (creator) and regular members
+
+### 2.3 Messaging System
+- **Group Chat:** House-wide messaging with all members
+- **Private Messages:** 1-on-1 conversations between housemates
+- **Features:** Text, images, read receipts, push notifications
+- **Message History:** Searchable chat history
+
+### 2.4 Bills & Expense Management
+- **Add Expense:** Amount, description, date, split type (equal/custom)
+- **Track Payments:** Who owes whom, payment history
+- **Recurring Bills:** Set up monthly utilities, rent, etc.
+- **Settlement:** Mark payments as complete
+- **Payment Integration:** Link PayPal/Venmo for in-app payments
+- **Reports:** Monthly summaries, individual balances
+
+### 2.5 Location Sharing
+- **Toggle On/Off:** Privacy-first approach
+- **Real-time Location:** When enabled, show on map
+- **Location History:** Last known location with timestamp
+- **Privacy Settings:** Individual control per housemate
+
+### 2.6 Chores Management
+- **Chore Calendar:** Visual calendar view
+- **Create Tasks:** Name, frequency, assignee, due date
+- **Rotation System:** Automatic assignment rotation
+- **Reminders:** Push notifications for upcoming chores
+- **Completion Tracking:** Check off completed tasks
+- **Point System:** Optional gamification
+
+## 3. User Interface Design
+
+### 3.1 Design Principles
+- **Clean & Modern:** Minimalist iOS design language
+- **Color Scheme:** Light theme with accent colors for different features
+- **Typography:** SF Pro Display/Text (iOS standard)
+- **Icons:** SF Symbols for consistency
+
+### 3.2 Navigation Structure
+- **Tab Bar Navigation:** 5 main tabs
+  1. Home/Dashboard
+  2. Messages
+  3. Bills
+  4. Location
+  5. Chores
+
+### 3.3 Key Screens
+
+#### Authentication Screens
+1. **Welcome Screen**
+   - App logo and tagline
+   - "Get Started" button leading to sign-up options
+   - "I already have an account" link to login
+
+2. **Sign Up Options Screen**
+   - "Continue with Apple" button (black)
+   - "Continue with Google" button (white/outlined)
+   - "Continue with Phone" button
+   - "Continue with Email" button
+   - Terms & Privacy Policy links at bottom
+
+3. **Phone Number Entry Screen**
+   - Phone number input with country code picker
+   - "Send Verification Code" button
+   - Auto-detect country based on location
+   - Progress indicator during sending
+
+4. **Verification Code Screen**
+   - 6-digit code input (auto-advance)
+   - "Resend Code" option (with countdown timer)
+   - Auto-verify when complete code entered
+   - "Change Phone Number" link
+
+5. **Email Sign Up Screen**
+   - Full name input
+   - Email input
+   - Password input (with show/hide toggle)
+   - Password requirements indicator
+   - "Create Account" button
+
+6. **Login Screen**
+   - "Continue with Apple" button
+   - "Continue with Google" button  
+   - "Continue with Phone" button
+   - "Use Email/Password" expandable section
+   - "Forgot Password?" link (for email users)
+
+7. **Profile Completion Screen** (after social/phone login)
+   - Display name (pre-filled if available)
+   - Optional: Add email for notifications
+   - Optional: Profile photo
+   - "Complete Setup" button
+
+#### Main App Screens
+
+1. **Home/Dashboard**
+   - House name and member avatars
+   - Quick stats (upcoming chores, pending payments)
+   - Recent activity feed
+   - Quick actions (add expense, create chore)
+
+2. **Messages**
+   - Tabbed view: "House Chat" | "Direct Messages"
+   - Chat list with last message preview
+   - Unread message indicators
+
+3. **Bills/Expenses**
+   - Balance summary card
+   - "You Owe" and "Owed to You" sections
+   - Add expense floating button
+   - Transaction history list
+
+4. **Location**
+   - Map view with member pins
+   - Member list with last seen times
+   - Toggle switch for your location sharing
+   - Privacy settings access
+
+5. **Chores**
+   - Calendar view (week/month toggle)
+   - Today's tasks card
+   - Add chore floating button
+   - Completion stats
+
+## 4. Data Models
+
+### 4.1 Firestore Database Structure
+
+```
+🔥 Firestore Collections & Documents
+
+/users/{userId}
+├── Profile Data:
+│   ├── id: String (Firebase UID)
+│   ├── email: String?
+│   ├── phoneNumber: String?
+│   ├── displayName: String
+│   ├── profilePhotoUrl: String?
+│   ├── authProviders: [String]
+│   ├── currentHouseId: String?
+│   ├── fcmToken: String?
+│   ├── createdAt: Timestamp
+│   ├── lastSeen: Timestamp
+│   └── settings: {
+│       ├── notificationsEnabled: Bool
+│       ├── locationSharingEnabled: Bool
+│       └── quietHoursEnabled: Bool
+│   }
+
+/houses/{houseId}
+├── House Data:
+│   ├── id: String
+│   ├── name: String
+│   ├── address: String?
+│   ├── inviteCode: String
+│   ├── createdBy: String (userId)
+│   ├── createdAt: Timestamp
+│   ├── memberCount: Number (denormalized)
+│   ├── memberIds: [String] (for security rules)
+│   └── settings: {
+│       ├── quietHoursStart: String?
+│       ├── quietHoursEnd: String?
+│       └── currency: String
+│   }
+│
+├── /members/{userId} (subcollection)
+│   ├── userId: String
+│   ├── displayName: String (denormalized)
+│   ├── profilePhotoUrl: String? (denormalized)
+│   ├── role: String ('admin' | 'member')
+│   ├── joinedAt: Timestamp
+│   ├── locationSharing: Bool
+│   └── lastLocation: {
+│       ├── latitude: Number
+│       ├── longitude: Number
+│       └── timestamp: Timestamp
+│   }
+│
+├── /messages/{messageId} (subcollection)
+│   ├── id: String
+│   ├── content: String
+│   ├── senderId: String
+│   ├── senderName: String (denormalized)
+│   ├── senderPhoto: String? (denormalized)
+│   ├── timestamp: Timestamp
+│   ├── type: String ('text' | 'image' | 'system')
+│   ├── imageUrl: String?
+│   └── readBy: [String] (userIds)
+│
+├── /expenses/{expenseId} (subcollection)
+│   ├── id: String
+│   ├── amount: Number
+│   ├── description: String
+│   ├── category: String
+│   ├── date: Timestamp
+│   ├── createdBy: String
+│   ├── createdByName: String (denormalized)
+│   ├── paidBy: String
+│   ├── paidByName: String (denormalized)
+│   ├── splits: [{
+│   │   ├── userId: String
+│   │   ├── userName: String (denormalized)
+│   │   ├── amount: Number
+│   │   └── isPaid: Bool
+│   │}]
+│   ├── isRecurring: Bool
+│   ├── recurringDay: Number?
+│   └── isSettled: Bool
+│
+├── /payments/{paymentId} (subcollection)
+│   ├── id: String
+│   ├── fromUserId: String
+│   ├── fromUserName: String (denormalized)
+│   ├── toUserId: String
+│   ├── toUserName: String (denormalized)
+│   ├── amount: Number
+│   ├── method: String ('cash' | 'paypal' | 'venmo' | 'inApp')
+│   ├── expenseIds: [String] (expenses being settled)
+│   ├── note: String?
+│   ├── timestamp: Timestamp
+│   └── status: String ('pending' | 'completed')
+│
+├── /chores/{choreId} (subcollection)
+│   ├── id: String
+│   ├── title: String
+│   ├── description: String?
+│   ├── assignedTo: String
+│   ├── assignedToName: String (denormalized)
+│   ├── createdBy: String
+│   ├── dueDate: Timestamp
+│   ├── frequency: String ('once' | 'daily' | 'weekly' | 'monthly')
+│   ├── isCompleted: Bool
+│   ├── completedAt: Timestamp?
+│   ├── completedBy: String?
+│   ├── nextDueDate: Timestamp? (for recurring)
+│   └── points: Number
+│
+└── /balances/{userId} (subcollection - derived data)
+    ├── userId: String
+    ├── totalOwed: Number
+    ├── totalOwes: Number
+    ├── balancesByUser: {
+    │   └── {userId}: Number (+ve they owe you, -ve you owe them)
+    │}
+    └── lastUpdated: Timestamp
+
+/invites/{inviteCode} (top-level for easy lookup)
+├── houseId: String
+├── houseName: String
+├── createdBy: String
+├── createdAt: Timestamp
+├── expiresAt: Timestamp
+└── maxUses: Number?
+└── currentUses: Number
+```
+
+### 4.2 Firestore-Optimized Data Patterns
+
+#### Denormalization Strategy
+Store frequently accessed data together to minimize reads:
+- User names and photos in messages/expenses/chores
+- Running balances in separate documents
+- Member count in house document
+
+#### Real-time Listeners
+```swift
+// Efficient listener setup
+- House details: Single listener
+- Recent messages: Limited query (last 50)
+- Active chores: Where dueDate >= today
+- Recent expenses: Last 30 days
+- Member locations: Only if sharing enabled
+```
+
+#### Composite Queries
+```swift
+// Indexes needed for common queries:
+- messages: (houseId, timestamp DESC)
+- chores: (assignedTo, dueDate, isCompleted)
+- expenses: (houseId, date DESC)
+- payments: (fromUserId, timestamp DESC)
+```
+
+## 5. Technical Architecture
+
+### 5.1 Technology Stack
+- **Language:** Swift 5.5+
+- **UI Framework:** SwiftUI
+- **Architecture:** MVVM
+- **Backend:** Firebase (Firestore NoSQL Database)
+- **Authentication:** Firebase Auth
+- **Real-time Updates:** Firestore Listeners
+- **File Storage:** Firebase Storage (images, photos)
+- **Cloud Functions:** Node.js (for complex operations)
+- **Payment APIs:** PayPal SDK, Venmo API
+- **Push Notifications:** Firebase Cloud Messaging (FCM)
+- **Analytics:** Firebase Analytics
+- **Maps:** MapKit
+- **Caching:** In-memory + UserDefaults
+
+### 5.2 Third-party Dependencies
+- Firebase iOS SDK (Auth, Firestore, Functions, Storage)
+- GoogleSignIn SDK
+- PayPal iOS SDK  
+- Alamofire (networking)
+- Kingfisher (image caching)
+- PhoneNumberKit (phone number formatting)
+
+### 5.3 Security Considerations
+- Automatic session management via Firebase Auth
+- Biometric authentication for returning users
+- Phone number verification via SMS
+- Email verification for email signups
+- Account linking to prevent duplicate accounts
+- End-to-end encryption for private messages
+- Location data privacy controls
+- Secure payment information handling
+- House invite codes with expiration
+- Role-based access control
+
+## 6. User Flows
+
+### 6.1 New User Flow
+1. Download app → Welcome screen
+2. Tap "Get Started" → Authentication options screen
+3. Choose authentication method:
+   - **Apple Sign-In:** → System dialog → Auto-create profile
+   - **Google Sign-In:** → Google OAuth → Auto-create profile  
+   - **Phone:** → Enter number → Verify SMS code → Complete profile
+   - **Email:** → Fill form → Verify email → Dashboard
+4. Complete profile (if needed)
+5. Choose: Create new house OR Join existing house
+6. If creating: Set house details, get invite code
+7. If joining: Enter invite code
+8. Land on Dashboard
+
+### 6.1.1 Returning User Flow
+1. Open app → Check for saved session
+2. If no session → Login screen
+3. Select previous auth method
+4. Quick authentication (biometric for Apple/Google)
+5. Return to last screen
+
+### 6.2 Add Expense Flow
+1. Tap "+" on Bills tab
+2. Enter amount and description
+3. Select who paid
+4. Choose split type (equal/custom)
+5. Select participants
+6. Save → Updates everyone's balance
+
+### 6.3 Complete Chore Flow
+1. View chore in calendar/list
+2. Tap to see details
+3. Mark as complete
+4. Optionally add photo proof
+5. Updates completion stats
+
+## 7. MVP vs Future Features
+
+### MVP (Version 1.0)
+- Basic authentication (all 4 methods)
+- House creation/joining  
+- Real-time group messaging (Firestore listeners)
+- Simple expense splitting with balance tracking
+- Basic chore calendar
+- Manual payment tracking
+- Push notifications for important events
+- Offline support (Firestore built-in)
+
+### Future Enhancements (Version 2.0+)
+- Direct messaging between roommates
+- Recurring expenses and chores
+- Payment gateway integration (PayPal/Venmo)
+- Location sharing with privacy controls
+- Advanced expense categories and budgeting
+- Photo attachments for chores/expenses
+- House bulletin board
+- Quiet hours automation
+- Activity feed/timeline
+- Data export features
+- Web companion app
+
+## 8. Design System Components
+
+### Reusable UI Components
+- **HomiButton:** Primary CTA button
+- **MemberAvatar:** Circular profile images
+- **ExpenseCard:** Transaction display
+- **ChoreCard:** Task display
+- **MessageBubble:** Chat messages
+- **TabIcon:** Custom tab bar icons
+
+### Color Palette
+- Primary: #007AFF (iOS Blue)
+- Success: #34C759 (Green)
+- Warning: #FF9500 (Orange)  
+- Danger: #FF3B30 (Red)
+- Background: #F2F2F7
+- Text Primary: #000000
+- Text Secondary: #8E8E93
+
+## 9. Analytics & Metrics
+
+Track key metrics:
+- User retention
+- Feature usage (which features are most popular)
+- Average expenses per house
+- Chore completion rates
+- Message frequency
+- Payment method preferences
+
+## 10. Launch Strategy
+
+### Beta Testing
+- TestFlight beta with 50-100 users
+- Focus on college students and young professionals
+- Gather feedback on core features
+
+### App Store Optimization
+- Keywords: roommate, bills, split, chores, house, sharing
+- Screenshots highlighting key features
+- App preview video
+
+## 11. Authentication Implementation Guide
+
+### Firebase Setup Requirements
+1. **Apple Sign-In**
+   - Enable in Xcode project capabilities
+   - Configure in Firebase Console
+   - Add Sign in with Apple capability in App Store Connect
+
+2. **Google Sign-In**
+   - Add Google Service Info plist
+   - Configure OAuth consent screen
+   - Add URL schemes to Info.plist
+
+3. **Phone Authentication**
+   - Enable in Firebase Console
+   - Configure SMS quota (free tier: 10K/month)
+   - Add reCAPTCHA verification for web fallback
+   - Test phone numbers for development
+
+4. **Email/Password**
+   - Enable in Firebase Console
+   - Configure password requirements
+   - Set up email templates for verification
+
+### Authentication Flow Best Practices
+- **Account Linking:** If user tries to sign up with an email/phone already associated with another provider, prompt to link accounts
+- **Silent Sign-In:** Attempt to restore session on app launch
+- **Biometric Lock:** Optional Face ID/Touch ID for quick access
+- **Guest Mode:** Consider allowing limited access without signup to reduce friction
+
+### Error Handling
+- Network connectivity issues
+- Invalid phone numbers
+- Blocked/spam phone numbers  
+- Weak passwords
+- Duplicate account attempts
+- Rate limiting
+
+## 12. Brand Identity for Homi
+
+### Brand Values
+- **Friendly:** Like having a helpful homie
+- **Trustworthy:** Your home data is safe
+- **Simple:** Easy to use, no friction
+- **Inclusive:** For all types of living situations
+
+### Visual Identity
+- **Logo:** Stylized house with heart or smiley face element
+- **Tagline Options:**
+  - "Your home's best friend"
+  - "Living together, made easy"
+  - "Home sweet Homi"
+  
+### App Icon Ideas
+- House shape with "H" integrated
+- Smiling house character
+- Overlapping speech bubbles forming a house
+- Heart + Home combination
+
+### Marketing Angles
+- Play on "homie" (friend) + "home"
+- "Homi has your back"
+- "Find your Homi" (for roommate matching)
+- #HomiVibes for social media
+
+---
+
+This design document provides a comprehensive blueprint for building the Homi app. Each section can be expanded with more detail as needed during development.
+
+## 13. Firestore Implementation Guide
+
+### Query Patterns & Best Practices
+
+#### 1. **Efficient Data Loading**
+```swift
+// Load house data with members
+let houseRef = db.collection("houses").document(houseId)
+let membersRef = houseRef.collection("members")
+
+// Use collection group for user's chores across houses
+let myChores = db.collectionGroup("chores")
+    .whereField("assignedTo", isEqualTo: userId)
+    .whereField("isCompleted", isEqualTo: false)
+    .order(by: "dueDate")
+```
+
+#### 2. **Real-time Listener Management**
+```swift
+// Set up listeners strategically
+class HouseViewModel {
+    // One-time fetch for static data
+    func loadHouseInfo() { }
+    
+    // Real-time for dynamic data
+    func listenToMessages() {
+        // Only last 50 messages
+        messagesListener = houseRef
+            .collection("messages")
+            .order(by: "timestamp", descending: true)
+            .limit(to: 50)
+            .addSnapshotListener { ... }
+    }
+    
+    // Clean up on view disappear
+    func detachListeners() {
+        messagesListener?.remove()
+    }
+}
+```
+
+#### 3. **Batch Operations**
+```swift
+// Update balances after payment
+let batch = db.batch()
+
+// Update payer balance
+batch.updateData([
+    "totalOwed": FieldValue.increment(-amount)
+], forDocument: payerBalanceRef)
+
+// Update receiver balance  
+batch.updateData([
+    "totalOwes": FieldValue.increment(-amount)
+], forDocument: receiverBalanceRef)
+
+// Create payment record
+batch.setData(paymentData, forDocument: paymentRef)
+
+// Commit all at once
+batch.commit()
+```
+
+#### 4. **Offline Support**
+```swift
+// Enable offline persistence
+let settings = FirestoreSettings()
+settings.isPersistenceEnabled = true
+settings.cacheSizeBytes = 50 * 1024 * 1024 // 50MB
+db.settings = settings
+```
+
+### Security Rules
+
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Users can read/update their own profile
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.uid == userId;
+    }
+    
+    // House access only for members
+    match /houses/{houseId} {
+      allow read: if request.auth.uid in resource.data.memberIds;
+      allow update: if request.auth.uid in resource.data.memberIds
+        && request.auth.uid == resource.data.createdBy;
+        
+      // Subcollections inherit house permissions
+      match /{subcollection}/{document} {
+        allow read: if request.auth.uid in 
+          get(/databases/$(database)/documents/houses/$(houseId)).data.memberIds;
+        allow create: if request.auth.uid in 
+          get(/databases/$(database)/documents/houses/$(houseId)).data.memberIds;
+        allow update: if request.auth.uid in 
+          get(/databases/$(database)/documents/houses/$(houseId)).data.memberIds
+          && (request.auth.uid == resource.data.createdBy || 
+              request.auth.uid == resource.data.assignedTo);
+      }
+    }
+    
+    // Invite codes are public read with code
+    match /invites/{inviteCode} {
+      allow read: if true;
+      allow write: if false; // Only through Cloud Functions
+    }
+  }
+}
+```
+
+### Cloud Functions (Essential)
+
+```javascript
+// 1. Balance Calculator
+exports.updateBalances = functions.firestore
+  .document('houses/{houseId}/expenses/{expenseId}')
+  .onWrite(async (change, context) => {
+    // Recalculate all balances for the house
+    // Update balance documents
+  });
+
+// 2. Recurring Chores
+exports.createRecurringChores = functions.pubsub
+  .schedule('0 0 * * *') // Daily at midnight
+  .onRun(async (context) => {
+    // Find completed recurring chores
+    // Create new instances for next period
+  });
+
+// 3. Cleanup Expired Invites  
+exports.cleanupInvites = functions.pubsub
+  .schedule('0 */6 * * *') // Every 6 hours
+  .onRun(async (context) => {
+    // Delete expired invite codes
+  });
+
+// 4. Send Push Notifications
+exports.sendChoreReminder = functions.firestore
+  .document('houses/{houseId}/chores/{choreId}')
+  .onCreate(async (snap, context) => {
+    // Send FCM to assigned user
+  });
+```
+
+### Cost Optimization Tips
+
+1. **Use Compound Queries**
+   ```swift
+   // Bad: Two separate queries
+   let owedExpenses = expenses.whereField("paidBy", isEqualTo: userId)
+   let owesExpenses = expenses.whereField("splits.userId", isEqualTo: userId)
+   
+   // Better: One query with local filtering
+   let allExpenses = expenses.whereField("date", isGreaterThan: thirtyDaysAgo)
+   ```
+
+2. **Cache Expensive Calculations**
+   ```swift
+   // Store monthly summaries instead of calculating
+   /houses/{houseId}/summaries/{yearMonth}
+   ```
+
+3. **Paginate Large Collections**
+   ```swift
+   func loadMoreMessages() {
+       query = query.start(afterDocument: lastDocument).limit(to: 25)
+   }
+   ```
+
+4. **Use Local State**
+   ```swift
+   // Don't refetch user profile repeatedly
+   class UserManager {
+       static let shared = UserManager()
+       private var cachedProfile: User?
+   }
+   ```
