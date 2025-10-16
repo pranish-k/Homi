@@ -201,9 +201,84 @@ struct Payment {
 - Update expense split statuses
 - Query expenses by date range
 
-## Phase 5: Tab Navigation & Dashboard
+## Phase 5: Chores Management (NEXT)
 
-### 5.1 Tab Structure
+### 5.1 Chore Features to Build
+- Create and assign chores to housemates
+- Set chore frequency (one-time, daily, weekly, monthly)
+- Due dates and reminders
+- Mark chores as complete
+- Chore rotation system (auto-reassign)
+- Optional points/gamification
+- Chore history and completion tracking
+
+### 5.2 Data Models Needed
+```swift
+struct Chore {
+    let id: String
+    let houseId: String
+    let title: String
+    let description: String?
+    let assignedTo: String
+    let assignedToName: String
+    let createdBy: String
+    let dueDate: Date
+    let frequency: ChoreFrequency
+    let isCompleted: Bool
+    let completedAt: Date?
+    let completedBy: String?
+    let points: Int
+    let category: ChoreCategory
+}
+
+enum ChoreFrequency {
+    case once
+    case daily
+    case weekly
+    case biweekly
+    case monthly
+}
+
+enum ChoreCategory {
+    case cleaning
+    case kitchen
+    case bathroom
+    case trash
+    case outdoor
+    case pets
+    case other
+}
+```
+
+### 5.3 Views to Create
+- `ChoresView.swift` - Main chores tab with list/calendar toggle
+- `AddChoreView.swift` - Form to create new chore
+- `ChoreCardView.swift` - Reusable chore display card
+- `ChoreDetailView.swift` - View/edit chore details
+- `ChoreCalendarView.swift` - Calendar view of upcoming chores
+- `ChoreCompletionView.swift` - Mark chore complete with optional photo
+
+### 5.4 Services to Implement
+- Create/update/delete chores
+- Mark chores as complete
+- Auto-rotation logic for recurring chores
+- Query upcoming chores
+- Get chores by assignee
+- Calculate completion stats
+
+### 5.5 Key Features
+- **Chore List View**: See all active chores
+- **Calendar View**: Visual calendar of upcoming due dates
+- **Filter by Assignee**: See your chores or everyone's
+- **Quick Complete**: Swipe or tap to mark done
+- **Recurring Chores**: Auto-create next occurrence
+- **Rotation**: Automatically assign to next person
+- **Stats**: Completion rates per person
+- **Notifications**: Remind before due date
+
+## Phase 6: Tab Navigation & Dashboard
+
+### 6.1 Tab Structure
 ```swift
 TabView {
     DashboardView().tabItem { Label("Home", systemImage: "house") }
@@ -214,20 +289,12 @@ TabView {
 }
 ```
 
-### 5.2 Dashboard Components
+### 6.2 Dashboard Components
 - House name header
 - Member avatars row
-- Quick stats cards
+- Quick stats cards (upcoming chores, pending payments, unread messages)
 - Recent activity list
-
-## Phase 6: Chores Management
-
-### 6.1 Chore Features
-- Chore calendar view
-- Create and assign tasks
-- Rotation system
-- Completion tracking
-- Reminders
+- Quick action buttons
 
 ## Phase 7: Location Sharing
 
@@ -235,6 +302,7 @@ TabView {
 - Real-time location on map
 - Toggle on/off for privacy
 - Last seen timestamps
+- Location history
 
 ## 1. App Overview
 
