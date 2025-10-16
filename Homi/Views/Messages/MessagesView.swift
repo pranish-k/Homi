@@ -6,7 +6,7 @@ struct MessagesView: View {
     @State private var selectedTab = 0
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
                 if let house = firestoreService.currentHouse,
                    let houseId = authService.userProfile?.currentHouseId {
@@ -23,7 +23,6 @@ struct MessagesView: View {
                     if selectedTab == 0 {
                         // House Group Chat
                         GroupChatView(houseId: houseId, houseName: house.name)
-                            .navigationBarHidden(true)
                     } else {
                         // Direct Messages (Coming soon)
                         directMessagesPlaceholder
@@ -35,10 +34,9 @@ struct MessagesView: View {
             }
             .navigationTitle("Messages")
             .navigationBarTitleDisplayMode(.large)
-        }
-        .navigationViewStyle(StackNavigationViewStyle())
-        .onAppear {
-            loadHouseData()
+            .onAppear {
+                loadHouseData()
+            }
         }
     }
 

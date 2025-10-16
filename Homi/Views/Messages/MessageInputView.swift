@@ -26,7 +26,7 @@ struct MessageInputView: View {
             // Send button
             Button(action: {
                 onSend()
-                isTextFieldFocused = true
+                isTextFieldFocused = false // Dismiss keyboard after sending
             }) {
                 Image(systemName: "arrow.up.circle.fill")
                     .font(.system(size: 32))

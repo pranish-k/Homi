@@ -45,8 +45,6 @@ struct GroupChatView: View {
                 }
             }
         }
-        .navigationTitle(houseName)
-        .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             viewModel.startListening(houseId: houseId)
         }

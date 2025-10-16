@@ -149,6 +149,12 @@ The messaging system is fully functional and ready for:
 - [x] Switch between tabs
 - [x] Error handling
 
+## UX Improvements:
+- ✅ Keyboard automatically dismisses after sending message
+- ✅ Proper navigation structure with back button support
+- ✅ Smooth tab switching between House Chat and Direct Messages
+- ✅ Clean navigation hierarchy prevents user from getting stuck
+
 ## Known Limitations:
 - Direct messages not yet implemented (shows placeholder)
 - Image messages structure ready but not implemented
