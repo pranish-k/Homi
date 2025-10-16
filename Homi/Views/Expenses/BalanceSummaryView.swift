@@ -23,8 +23,15 @@ struct BalanceSummaryView: View {
                     }
                 }
             } else if totalYouOwe == 0 && totalOwedToYou == 0 {
-                // Only show "all settled up" if truly no balances
+                // Only show empty state when truly no balances at all
                 emptyStateView
+            } else {
+                // If we have totals but no individual balances, something's wrong
+                // Show a message for debugging
+                Text("Balances are being calculated...")
+                    .font(.caption)
+                    .foregroundColor(Constants.Colors.textSecondary)
+                    .padding()
             }
         }
     }
