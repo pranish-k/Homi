@@ -117,7 +117,7 @@ struct MainTabView: View {
                 }
                 .tag(3)
 
-            PlaceholderView(title: "Chores", icon: "checklist", color: Constants.Colors.primary)
+            ChoresView()
                 .tabItem {
                     Label("Chores", systemImage: "checklist")
                 }
