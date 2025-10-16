@@ -87,6 +87,7 @@ struct AuthenticationView: View {
 
 struct MainTabView: View {
     @StateObject private var authService = AuthService.shared
+    @StateObject private var firestoreService = FirestoreService.shared
 
     var body: some View {
         TabView {
@@ -95,7 +96,8 @@ struct MainTabView: View {
                     Label("Home", systemImage: "house.fill")
                 }
 
-            PlaceholderView(title: "Messages", icon: "message.fill", color: Constants.Colors.primary)
+            MessagesView()
+                .environmentObject(firestoreService)
                 .tabItem {
                     Label("Chat", systemImage: "message")
                 }
