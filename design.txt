@@ -144,9 +144,66 @@ struct House: Codable {
 - **Segmented control** - For switching between House Chat and Direct Messages
 - **Real-time updates** - Via Firestore listeners
 
-## Phase 4: Tab Navigation & Dashboard (NEXT)
+## Phase 4: Bills & Expense Tracking (NEXT)
 
-### 4.1 Tab Structure
+### 4.1 Expense Features to Build
+- Add expense with amount, description, date
+- Select who paid for the expense
+- Split types: Equal split or Custom amounts
+- Track who owes whom (running balances)
+- Payment tracking and settlement
+- Mark payments as complete
+- Expense history and filtering
+
+### 4.2 Data Models Needed
+```swift
+struct Expense {
+    let id: String
+    let amount: Double
+    let description: String
+    let category: String
+    let date: Date
+    let paidBy: String
+    let paidByName: String
+    let splits: [ExpenseSplit]
+    let isSettled: Bool
+}
+
+struct ExpenseSplit {
+    let userId: String
+    let userName: String
+    let amount: Double
+    let isPaid: Bool
+}
+
+struct Payment {
+    let id: String
+    let fromUserId: String
+    let toUserId: String
+    let amount: Double
+    let expenseIds: [String]
+    let timestamp: Date
+}
+```
+
+### 4.3 Views to Create
+- `ExpensesView.swift` - Main expenses tab
+- `AddExpenseView.swift` - Form to add new expense
+- `ExpenseDetailView.swift` - View/edit expense details
+- `BalanceSummaryView.swift` - Who owes whom overview
+- `SettlePaymentView.swift` - Record a payment
+- `ExpenseCardView.swift` - Reusable expense list item
+
+### 4.4 Services to Implement
+- Create expense in Firestore
+- Calculate balances (who owes whom)
+- Record payments
+- Update expense split statuses
+- Query expenses by date range
+
+## Phase 5: Tab Navigation & Dashboard
+
+### 5.1 Tab Structure
 ```swift
 TabView {
     DashboardView().tabItem { Label("Home", systemImage: "house") }
@@ -157,11 +214,27 @@ TabView {
 }
 ```
 
-### 4.2 Dashboard Components
+### 5.2 Dashboard Components
 - House name header
 - Member avatars row
 - Quick stats cards
 - Recent activity list
+
+## Phase 6: Chores Management
+
+### 6.1 Chore Features
+- Chore calendar view
+- Create and assign tasks
+- Rotation system
+- Completion tracking
+- Reminders
+
+## Phase 7: Location Sharing
+
+### 7.1 Location Features
+- Real-time location on map
+- Toggle on/off for privacy
+- Last seen timestamps
 
 ## 1. App Overview
 
