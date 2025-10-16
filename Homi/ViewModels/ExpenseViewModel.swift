@@ -72,7 +72,7 @@ class ExpenseViewModel: ObservableObject {
     func createExpense() async {
         guard let houseId = currentHouseId,
               let userId = currentUserId,
-              let userName = authService.userProfile?.displayName else {
+              let _ = authService.userProfile?.displayName else {
             errorMessage = "Missing required information"
             showError = true
             return
@@ -104,12 +104,6 @@ class ExpenseViewModel: ObservableObject {
         }
 
         // Get house members for names
-        guard let house = try? await FirestoreService.shared.getHouse(id: houseId) else {
-            errorMessage = "Could not load house information"
-            showError = true
-            return
-        }
-
         let members = try? await FirestoreService.shared.getHouseMembers(houseId: houseId)
         guard let members = members else {
             errorMessage = "Could not load house members"

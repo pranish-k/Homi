@@ -103,7 +103,7 @@ class ExpenseService: ObservableObject {
             .document(expenseId)
 
         let document = try await expenseRef.getDocument()
-        guard var expense = Expense.fromFirestore(document.data() ?? [:]) else {
+        guard let expense = Expense.fromFirestore(document.data() ?? [:]) else {
             throw NSError(domain: "ExpenseService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Could not parse expense"])
         }
 
@@ -151,7 +151,7 @@ class ExpenseService: ObservableObject {
 
             // Get expense and update split
             let expenseDoc = try await expenseRef.getDocument()
-            if var expense = Expense.fromFirestore(expenseDoc.data() ?? [:]) {
+            if let expense = Expense.fromFirestore(expenseDoc.data() ?? [:]) {
                 var updatedSplits = expense.splits
                 if let index = updatedSplits.firstIndex(where: { $0.userId == payment.fromUserId }) {
                     updatedSplits[index] = ExpenseSplit(

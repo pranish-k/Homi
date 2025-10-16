@@ -14,7 +14,7 @@ struct ExpensesView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                if let houseId = authService.userProfile?.currentHouseId {
+                if authService.userProfile?.currentHouseId != nil {
                     // Tab selector
                     Picker("View", selection: $selectedTab) {
                         Text("Expenses").tag(0)

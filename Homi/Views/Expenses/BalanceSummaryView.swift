@@ -22,7 +22,8 @@ struct BalanceSummaryView: View {
                         balanceRow(balance: balance)
                     }
                 }
-            } else {
+            } else if totalYouOwe == 0 && totalOwedToYou == 0 {
+                // Only show "all settled up" if truly no balances
                 emptyStateView
             }
         }

@@ -1,0 +1,1 @@
+1. Every time a message gets sent, there is a time stamp right under it. This is annoying. 
