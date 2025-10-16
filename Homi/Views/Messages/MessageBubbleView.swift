@@ -111,10 +111,20 @@ struct RoundedCorner: Shape {
     var corners: UIRectCorner = .allCorners
 
     func path(in rect: CGRect) -> Path {
+        // Validate rect to prevent NaN errors in CoreGraphics
+        guard rect.width.isFinite && rect.height.isFinite &&
+              !rect.width.isNaN && !rect.height.isNaN &&
+              rect.width >= 0 && rect.height >= 0 else {
+            return Path()
+        }
+
+        // Ensure radius is valid
+        let validRadius = radius.isFinite && !radius.isNaN ? radius : 0
+
         let path = UIBezierPath(
             roundedRect: rect,
             byRoundingCorners: corners,
-            cornerRadii: CGSize(width: radius, height: radius)
+            cornerRadii: CGSize(width: validRadius, height: validRadius)
         )
         return Path(path.cgPath)
     }
