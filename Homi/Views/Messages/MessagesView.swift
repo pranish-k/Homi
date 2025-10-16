@@ -3,7 +3,8 @@ import SwiftUI
 struct MessagesView: View {
     @EnvironmentObject var firestoreService: FirestoreService
     @StateObject private var authService = AuthService.shared
-    @State private var selectedTab = 0
+    @State private var messageTab = 0
+    @Binding var selectedTab: Int
 
     var body: some View {
         NavigationStack {
@@ -11,7 +12,7 @@ struct MessagesView: View {
                 if let house = firestoreService.currentHouse,
                    let houseId = authService.userProfile?.currentHouseId {
                     // Tab selector
-                    Picker("Message Type", selection: $selectedTab) {
+                    Picker("Message Type", selection: $messageTab) {
                         Text("House Chat").tag(0)
                         Text("Direct Messages").tag(1)
                     }
@@ -20,7 +21,7 @@ struct MessagesView: View {
                     .padding(.vertical, Constants.Spacing.small)
 
                     // Content based on selected tab
-                    if selectedTab == 0 {
+                    if messageTab == 0 {
                         // House Group Chat
                         GroupChatView(houseId: houseId, houseName: house.name)
                     } else {
@@ -34,6 +35,22 @@ struct MessagesView: View {
             }
             .navigationTitle("Messages")
             .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        // Dismiss keyboard first
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                        // Navigate back to home tab
+                        selectedTab = 0
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.left")
+                            Text("Home")
+                        }
+                        .foregroundColor(Constants.Colors.primary)
+                    }
+                }
+            }
             .onAppear {
                 loadHouseData()
             }
@@ -103,7 +120,7 @@ struct MessagesView: View {
 // MARK: - Preview
 struct MessagesView_Previews: PreviewProvider {
     static var previews: some View {
-        MessagesView()
+        MessagesView(selectedTab: .constant(1))
             .environmentObject(FirestoreService.shared)
     }
 }

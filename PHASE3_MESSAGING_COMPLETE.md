@@ -150,10 +150,11 @@ The messaging system is fully functional and ready for:
 - [x] Error handling
 
 ## UX Improvements:
-- ✅ Keyboard automatically dismisses after sending message
-- ✅ Proper navigation structure with back button support
-- ✅ Smooth tab switching between House Chat and Direct Messages
-- ✅ Clean navigation hierarchy prevents user from getting stuck
+- ✅ **User-controlled navigation** - Back button in top-left manually dismisses keyboard and returns to Home tab
+- ✅ **Keyboard stays open** - After sending a message, keyboard remains active for continuous messaging
+- ✅ **Proper navigation structure** - NavigationStack with custom toolbar button
+- ✅ **Smooth tab switching** - Between House Chat and Direct Messages within the Messages view
+- ✅ **Clean navigation hierarchy** - Users control when to leave the messaging view
 
 ## Known Limitations:
 - Direct messages not yet implemented (shows placeholder)

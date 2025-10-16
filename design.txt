@@ -138,10 +138,11 @@ struct House: Codable {
 - `MessageInputView.swift` - Text input with send button
 
 ### 3.3 UX Features
-- Keyboard automatically dismisses after sending
-- NavigationStack for proper back button support
-- Segmented control for tab switching
-- Real-time message updates via Firestore listeners
+- **User-controlled navigation** - Manual back button (top-left) dismisses keyboard and returns to Home
+- **Keyboard persistence** - Stays open after sending for continuous messaging
+- **NavigationStack** - Proper back button support with custom toolbar
+- **Segmented control** - For switching between House Chat and Direct Messages
+- **Real-time updates** - Via Firestore listeners
 
 ## Phase 4: Tab Navigation & Dashboard (NEXT)
 

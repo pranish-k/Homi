@@ -88,34 +88,40 @@ struct AuthenticationView: View {
 struct MainTabView: View {
     @StateObject private var authService = AuthService.shared
     @StateObject private var firestoreService = FirestoreService.shared
+    @State private var selectedTab = 0
 
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             DashboardView()
                 .tabItem {
                     Label("Home", systemImage: "house.fill")
                 }
+                .tag(0)
 
-            MessagesView()
+            MessagesView(selectedTab: $selectedTab)
                 .environmentObject(firestoreService)
                 .tabItem {
                     Label("Chat", systemImage: "message")
                 }
+                .tag(1)
 
             PlaceholderView(title: "Bills & Expenses", icon: "dollarsign.circle.fill", color: Constants.Colors.success)
                 .tabItem {
                     Label("Bills", systemImage: "dollarsign.circle")
                 }
+                .tag(2)
 
             PlaceholderView(title: "Location", icon: "location.fill", color: Constants.Colors.warning)
                 .tabItem {
                     Label("Location", systemImage: "location")
                 }
+                .tag(3)
 
             PlaceholderView(title: "Chores", icon: "checklist", color: Constants.Colors.primary)
                 .tabItem {
                     Label("Chores", systemImage: "checklist")
                 }
+                .tag(4)
         }
         .accentColor(Constants.Colors.primary)
     }
