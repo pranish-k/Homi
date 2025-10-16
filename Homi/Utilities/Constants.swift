@@ -55,6 +55,19 @@ struct Constants {
     }
 
     // MARK: - Firebase Collections
+    struct Collections {
+        static let users = "users"
+        static let houses = "houses"
+        static let invites = "invites"
+        static let members = "members"
+        static let messages = "messages"
+        static let expenses = "expenses"
+        static let payments = "payments"
+        static let chores = "chores"
+        static let balances = "balances"
+    }
+
+    // MARK: - Firebase (Legacy - for backwards compatibility)
     struct Firebase {
         static let usersCollection = "users"
         static let housesCollection = "houses"

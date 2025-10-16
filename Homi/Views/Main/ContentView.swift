@@ -105,7 +105,7 @@ struct MainTabView: View {
                 }
                 .tag(1)
 
-            PlaceholderView(title: "Bills & Expenses", icon: "dollarsign.circle.fill", color: Constants.Colors.success)
+            ExpensesView()
                 .tabItem {
                     Label("Bills", systemImage: "dollarsign.circle")
                 }
