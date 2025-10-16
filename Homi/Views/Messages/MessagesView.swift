@@ -34,7 +34,7 @@ struct MessagesView: View {
                 }
             }
             .navigationTitle("Messages")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button(action: {
@@ -43,11 +43,9 @@ struct MessagesView: View {
                         // Navigate back to home tab
                         selectedTab = 0
                     }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "chevron.left")
-                            Text("Home")
-                        }
-                        .foregroundColor(Constants.Colors.primary)
+                        Image(systemName: "chevron.left")
+                            .font(.title3)
+                            .foregroundColor(Constants.Colors.primary)
                     }
                 }
             }
