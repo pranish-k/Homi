@@ -69,7 +69,7 @@ class FirestoreService: ObservableObject {
             throw FirestoreError.noUser
         }
 
-        let inviteCode = generateInviteCode()
+        let inviteCode = try await generateInviteCode()
         let houseId = db.collection(Constants.Collections.houses).document().documentID
 
         let house = House(
@@ -318,9 +318,29 @@ class FirestoreService: ObservableObject {
 
     // MARK: - Helper Methods
 
-    private func generateInviteCode() -> String {
+    private func generateInviteCode() async throws -> String {
         let letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-        return String((0..<Constants.Validation.inviteCodeLength).map { _ in letters.randomElement()! })
+        var attempts = 0
+        let maxAttempts = 5
+
+        // Retry until we get a unique code
+        while attempts < maxAttempts {
+            let code = String((0..<Constants.Validation.inviteCodeLength).map { _ in letters.randomElement()! })
+
+            // Check if code already exists
+            let existingInvite = try await db.collection(Constants.Collections.invites)
+                .document(code)
+                .getDocument()
+
+            if !existingInvite.exists {
+                return code
+            }
+
+            attempts += 1
+        }
+
+        // If we couldn't generate a unique code, throw an error
+        throw FirestoreError.inviteCodeGenerationFailed
     }
 }
 
@@ -332,6 +352,7 @@ enum FirestoreError: LocalizedError {
     case expiredInviteCode
     case houseNotFound
     case alreadyMember
+    case inviteCodeGenerationFailed
 
     var errorDescription: String? {
         switch self {
@@ -345,6 +366,8 @@ enum FirestoreError: LocalizedError {
             return "House not found"
         case .alreadyMember:
             return "You are already a member of this house"
+        case .inviteCodeGenerationFailed:
+            return "Failed to generate unique invite code. Please try again."
         }
     }
 }

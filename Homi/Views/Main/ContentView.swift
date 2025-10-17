@@ -127,6 +127,16 @@ struct MainTabView: View {
                 .tag(4)
         }
         .accentColor(Constants.Colors.primary)
+        .onDisappear {
+            // Cleanup all listeners when leaving main tab view
+            cleanupServices()
+        }
+    }
+
+    private func cleanupServices() {
+        ExpenseService.shared.stopListening()
+        ChoreService.shared.stopListening()
+        LocationService.shared.stopListening()
     }
 }
 

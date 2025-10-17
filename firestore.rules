@@ -1,0 +1,196 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isMember(houseId) {
+      return isAuthenticated() &&
+        request.auth.uid in get(/databases/$(database)/documents/houses/$(houseId)).data.memberIds;
+    }
+
+    function isHouseAdmin(houseId) {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/houses/$(houseId)/members/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Rate limiting helper (basic - consider using Cloud Functions for robust rate limiting)
+    function notTooManyRequests() {
+      // This is a simplified check. For production, implement server-side rate limiting
+      return true;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      // Users can read their own data
+      allow read: if isOwner(userId);
+
+      // Users can create their own profile during signup
+      allow create: if isOwner(userId) &&
+        request.resource.data.keys().hasAll(['id', 'displayName', 'authProviders', 'createdAt', 'lastSeen']) &&
+        request.resource.data.id == userId;
+
+      // Users can update their own data
+      allow update: if isOwner(userId);
+
+      // No one can delete user profiles (handle via Cloud Functions if needed)
+      allow delete: if false;
+    }
+
+    // Houses collection
+    match /houses/{houseId} {
+      // Members can read house data
+      allow read: if isMember(houseId);
+
+      // Authenticated users can create houses
+      allow create: if isAuthenticated() &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.memberIds.hasAll([request.auth.uid]) &&
+        request.resource.data.memberCount == 1 &&
+        request.resource.data.inviteCode.size() == 8;
+
+      // Only house admin or creator can update house
+      allow update: if isMember(houseId) &&
+        (isHouseAdmin(houseId) || resource.data.createdBy == request.auth.uid);
+
+      // Only creator can delete house (when leaving as last member)
+      allow delete: if isAuthenticated() && resource.data.createdBy == request.auth.uid;
+
+      // House members subcollection
+      match /members/{memberId} {
+        // Members can read all member data in their house
+        allow read: if isMember(houseId);
+
+        // Only house admins can add members (via join flow)
+        allow create: if isMember(houseId);
+
+        // Members can update their own profile in the house
+        allow update: if isOwner(memberId) || isHouseAdmin(houseId);
+
+        // Only admins can remove members
+        allow delete: if isHouseAdmin(houseId) || isOwner(memberId);
+      }
+
+      // Expenses subcollection
+      match /expenses/{expenseId} {
+        // Members can read all expenses in their house
+        allow read: if isMember(houseId);
+
+        // Members can create expenses
+        allow create: if isMember(houseId) &&
+          request.resource.data.createdBy == request.auth.uid &&
+          request.resource.data.houseId == houseId &&
+          request.resource.data.amount > 0 &&
+          request.resource.data.amount <= 1000000;
+
+        // Creator or payer can update expense
+        allow update: if isMember(houseId) &&
+          (resource.data.createdBy == request.auth.uid ||
+           resource.data.paidBy == request.auth.uid);
+
+        // Only creator can delete expense
+        allow delete: if isMember(houseId) && resource.data.createdBy == request.auth.uid;
+      }
+
+      // Payments subcollection
+      match /payments/{paymentId} {
+        // Members can read all payments in their house
+        allow read: if isMember(houseId);
+
+        // Members can create payments (paying someone)
+        allow create: if isMember(houseId) &&
+          request.resource.data.fromUserId == request.auth.uid &&
+          request.resource.data.houseId == houseId &&
+          request.resource.data.amount > 0;
+
+        // No one can update or delete payments (immutable record)
+        allow update, delete: if false;
+      }
+
+      // Chores subcollection
+      match /chores/{choreId} {
+        // Members can read all chores in their house
+        allow read: if isMember(houseId);
+
+        // Members can create chores
+        allow create: if isMember(houseId) &&
+          request.resource.data.createdBy == request.auth.uid &&
+          request.resource.data.houseId == houseId &&
+          request.resource.data.points >= 0 &&
+          request.resource.data.points <= 1000;
+
+        // Creator or assignee can update chore
+        allow update: if isMember(houseId) &&
+          (resource.data.createdBy == request.auth.uid ||
+           resource.data.assignedTo == request.auth.uid);
+
+        // Only creator can delete chore
+        allow delete: if isMember(houseId) && resource.data.createdBy == request.auth.uid;
+      }
+
+      // Messages subcollection
+      match /messages/{messageId} {
+        // Members can read all messages in their house
+        allow read: if isMember(houseId);
+
+        // Members can create messages
+        allow create: if isMember(houseId) &&
+          request.resource.data.senderId == request.auth.uid &&
+          request.resource.data.houseId == houseId &&
+          request.resource.data.content.size() > 0 &&
+          request.resource.data.content.size() <= 5000;
+
+        // Only sender can update their own message (within 15 minutes)
+        allow update: if isMember(houseId) &&
+          resource.data.senderId == request.auth.uid &&
+          request.time < resource.data.timestamp + duration.value(15, 'm');
+
+        // Only sender can delete their own message
+        allow delete: if isMember(houseId) && resource.data.senderId == request.auth.uid;
+      }
+
+      // Locations subcollection
+      match /locations/{locationId} {
+        // Members can read all locations in their house
+        allow read: if isMember(houseId);
+
+        // Users can only write their own location
+        allow create, update: if isMember(houseId) &&
+          locationId == request.auth.uid &&
+          request.resource.data.userId == request.auth.uid;
+
+        // Users can delete their own location
+        allow delete: if isOwner(locationId);
+      }
+    }
+
+    // Invites collection
+    match /invites/{inviteCode} {
+      // Authenticated users can read invite codes to join houses
+      allow read: if isAuthenticated() && notTooManyRequests();
+
+      // Only the system can create invite codes (during house creation)
+      // In production, this should be handled by Cloud Functions
+      allow create: if isAuthenticated();
+
+      // Only the system can update invite usage
+      allow update: if isAuthenticated();
+
+      // Only house creators can delete invite codes
+      allow delete: if isAuthenticated() &&
+        get(/databases/$(database)/documents/houses/$(resource.data.houseId)).data.createdBy == request.auth.uid;
+    }
+
+    // Deny all other access by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

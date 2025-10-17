@@ -16,6 +16,10 @@ class ExpenseService: ObservableObject {
     private let db = Firestore.firestore()
     private var expensesListener: ListenerRegistration?
     private var paymentsListener: ListenerRegistration?
+    private var currentHouseId: String?
+    private var retryCount = 0
+    private let maxRetries = 3
+    private var retryTask: Task<Void, Never>?
 
     private init() {}
 
@@ -47,6 +51,8 @@ class ExpenseService: ObservableObject {
     /// Start listening to expenses in real-time
     func startListeningToExpenses(houseId: String) {
         stopListening()
+        currentHouseId = houseId
+        retryCount = 0
 
         isLoading = true
 
@@ -60,6 +66,9 @@ class ExpenseService: ObservableObject {
                 if let error = error {
                     self.errorMessage = error.localizedDescription
                     self.isLoading = false
+
+                    // Attempt to retry with exponential backoff
+                    self.retryListenerWithBackoff(houseId: houseId)
                     return
                 }
 
@@ -72,8 +81,30 @@ class ExpenseService: ObservableObject {
                     Expense.fromFirestore(doc.data())
                 }
 
+                // Reset retry count on successful connection
+                self.retryCount = 0
                 self.isLoading = false
             }
+    }
+
+    /// Retry listener connection with exponential backoff
+    private func retryListenerWithBackoff(houseId: String) {
+        guard retryCount < maxRetries else {
+            errorMessage = "Unable to connect. Please check your internet connection and try again."
+            return
+        }
+
+        retryCount += 1
+        let delay = pow(2.0, Double(retryCount)) // 2, 4, 8 seconds
+
+        retryTask?.cancel()
+        retryTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+
+            if !Task.isCancelled {
+                startListeningToExpenses(houseId: houseId)
+            }
+        }
     }
 
     /// Update an expense
@@ -260,10 +291,14 @@ class ExpenseService: ObservableObject {
     // MARK: - Cleanup
 
     func stopListening() {
+        retryTask?.cancel()
+        retryTask = nil
         expensesListener?.remove()
         paymentsListener?.remove()
         expensesListener = nil
         paymentsListener = nil
+        currentHouseId = nil
+        retryCount = 0
     }
 
     func clearExpenses() {

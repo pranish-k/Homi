@@ -79,9 +79,13 @@ struct Constants {
     struct Validation {
         static let minPasswordLength = 8
         static let maxNameLength = 50
-        static let inviteCodeLength = 6
+        static let inviteCodeLength = 8  // Increased from 6 to 8 for better security
         static let phoneNumberLength = 10
         static let otpCodeLength = 6
+        static let maxExpenseAmount = 1000000.0  // Max $1M
+        static let maxChorePoints = 1000
+        static let maxHouseNameLength = 100
+        static let maxDescriptionLength = 500
     }
 
     // MARK: - Error Messages

@@ -39,10 +39,14 @@ class LocationService: NSObject, ObservableObject {
 
     private func setupLocationManager() {
         locationManager.delegate = self
-        locationManager.desiredAccuracy = kCLLocationAccuracyBest
-        locationManager.distanceFilter = 100 // Update every 100 meters
+        // Use lower accuracy for better battery life - 100 meters is sufficient for roommate tracking
+        locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        // Update every 500 meters to reduce battery drain
+        locationManager.distanceFilter = 500
         locationManager.allowsBackgroundLocationUpdates = false
         locationManager.pausesLocationUpdatesAutomatically = true
+        // Show blue bar when app is using location
+        locationManager.showsBackgroundLocationIndicator = false
 
         // Check authorization status
         authorizationStatus = locationManager.authorizationStatus

@@ -15,6 +15,10 @@ class ChoreService: ObservableObject {
     private let db = Firestore.firestore()
     private var choresListener: ListenerRegistration?
     private let logger = Logger(subsystem: "com.homi.app", category: "ChoreService")
+    private var currentHouseId: String?
+    private var retryCount = 0
+    private let maxRetries = 3
+    private var retryTask: Task<Void, Never>?
 
     private init() {}
 
@@ -46,6 +50,8 @@ class ChoreService: ObservableObject {
     /// Start listening to chores in real-time
     func startListeningToChores(houseId: String) {
         stopListening()
+        currentHouseId = houseId
+        retryCount = 0
 
         isLoading = true
 
@@ -57,8 +63,12 @@ class ChoreService: ObservableObject {
                 guard let self = self else { return }
 
                 if let error = error {
+                    self.logger.error("Chores listener error: \(error.localizedDescription)")
                     self.errorMessage = error.localizedDescription
                     self.isLoading = false
+
+                    // Attempt to retry with exponential backoff
+                    self.retryListenerWithBackoff(houseId: houseId)
                     return
                 }
 
@@ -71,8 +81,33 @@ class ChoreService: ObservableObject {
                     Chore.fromFirestore(doc.data())
                 }
 
+                // Reset retry count on successful connection
+                self.retryCount = 0
                 self.isLoading = false
+                self.logger.info("Chores loaded successfully: \(self.chores.count) chores")
             }
+    }
+
+    /// Retry listener connection with exponential backoff
+    private func retryListenerWithBackoff(houseId: String) {
+        guard retryCount < maxRetries else {
+            errorMessage = "Unable to connect. Please check your internet connection and try again."
+            logger.error("Max retries reached for chores listener")
+            return
+        }
+
+        retryCount += 1
+        let delay = pow(2.0, Double(retryCount)) // 2, 4, 8 seconds
+        logger.info("Retrying chores listener in \(delay) seconds (attempt \(self.retryCount)/\(self.maxRetries))")
+
+        retryTask?.cancel()
+        retryTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+
+            if !Task.isCancelled {
+                startListeningToChores(houseId: houseId)
+            }
+        }
     }
 
     /// Update a chore
@@ -268,8 +303,12 @@ class ChoreService: ObservableObject {
     // MARK: - Cleanup
 
     func stopListening() {
+        retryTask?.cancel()
+        retryTask = nil
         choresListener?.remove()
         choresListener = nil
+        currentHouseId = nil
+        retryCount = 0
     }
 
     func clearChores() {
