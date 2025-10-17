@@ -2,6 +2,7 @@ import Foundation
 import FirebaseFirestore
 import FirebaseAuth
 import Combine
+import OSLog
 
 @MainActor
 class ChoreService: ObservableObject {
@@ -13,6 +14,7 @@ class ChoreService: ObservableObject {
 
     private let db = Firestore.firestore()
     private var choresListener: ListenerRegistration?
+    private let logger = Logger(subsystem: "com.homi.app", category: "ChoreService")
 
     private init() {}
 
@@ -144,10 +146,21 @@ class ChoreService: ObservableObject {
         if chore.rotationEnabled, let nextUserId = chore.nextAssignee() {
             nextAssignee = nextUserId
 
-            // Get the name from rotation order
-            // We'll need to pass member list or fetch from Firestore
-            // For now, keep existing name and update in ViewModel
-            nextAssigneeName = "Next Person" // Will be updated by ViewModel
+            // Fetch the actual assignee name from Firestore
+            do {
+                let userDoc = try await db.collection(Constants.Collections.users)
+                    .document(nextUserId)
+                    .getDocument()
+
+                if let user = User(document: userDoc) {
+                    nextAssigneeName = user.displayName
+                } else {
+                    nextAssigneeName = "Unknown User"
+                }
+            } catch {
+                logger.error("Error fetching next assignee name: \(error.localizedDescription)")
+                nextAssigneeName = "Unknown User"
+            }
         }
 
         let nextChore = Chore(

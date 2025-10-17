@@ -199,6 +199,7 @@ class ExpenseService: ObservableObject {
     // MARK: - Balance Calculations
 
     /// Calculate balances between current user and all other house members
+    /// Optimized to filter unsettled expenses first and reduce iterations
     func calculateBalances(currentUserId: String, houseMembers: [HouseMember]) -> [Balance] {
         var balanceDict: [String: Balance] = [:]
 
@@ -212,53 +213,48 @@ class ExpenseService: ObservableObject {
             )
         }
 
+        // Filter unsettled expenses once to avoid checking isSettled repeatedly
+        let unsettledExpenses = expenses.filter { !$0.isSettled }
+
         // Calculate from expenses
-        for expense in expenses where !expense.isSettled {
+        for expense in unsettledExpenses {
             // If current user paid
             if expense.paidBy == currentUserId {
-                for split in expense.splits where split.userId != currentUserId && !split.isPaid {
-                    if var balance = balanceDict[split.userId] {
-                        balance.owedToYou += split.amount
-                        balanceDict[split.userId] = balance
-                    }
+                // Use forEach instead of nested for-where for better performance
+                expense.splits.forEach { split in
+                    guard split.userId != currentUserId && !split.isPaid else { return }
+                    balanceDict[split.userId]?.owedToYou += split.amount
                 }
             }
             // If current user owes
             else if let currentUserSplit = expense.splits.first(where: { $0.userId == currentUserId && !$0.isPaid }) {
-                if var balance = balanceDict[expense.paidBy] {
-                    balance.youOwe += currentUserSplit.amount
-                    balanceDict[expense.paidBy] = balance
-                }
+                balanceDict[expense.paidBy]?.youOwe += currentUserSplit.amount
             }
         }
 
-        return Array(balanceDict.values).filter { $0.netBalance != 0 }
+        // Filter out zero balances
+        return balanceDict.values.filter { $0.netBalance != 0 }
     }
 
-    /// Get total amount you owe
+    /// Get total amount you owe (optimized with reduce)
     func getTotalYouOwe(currentUserId: String) -> Double {
-        var total = 0.0
-
-        for expense in expenses where !expense.isSettled {
-            if let currentUserSplit = expense.splits.first(where: { $0.userId == currentUserId && !$0.isPaid }) {
-                total += currentUserSplit.amount
+        return expenses
+            .filter { !$0.isSettled }
+            .compactMap { expense in
+                expense.splits.first(where: { $0.userId == currentUserId && !$0.isPaid })?.amount
             }
-        }
-
-        return total
+            .reduce(0, +)
     }
 
-    /// Get total amount owed to you
+    /// Get total amount owed to you (optimized with reduce)
     func getTotalOwedToYou(currentUserId: String) -> Double {
-        var total = 0.0
-
-        for expense in expenses where !expense.isSettled && expense.paidBy == currentUserId {
-            for split in expense.splits where split.userId != currentUserId && !split.isPaid {
-                total += split.amount
+        return expenses
+            .filter { !$0.isSettled && $0.paidBy == currentUserId }
+            .flatMap { expense in
+                expense.splits.filter { $0.userId != currentUserId && !$0.isPaid }
             }
-        }
-
-        return total
+            .map(\.amount)
+            .reduce(0, +)
     }
 
     // MARK: - Cleanup

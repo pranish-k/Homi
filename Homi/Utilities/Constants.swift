@@ -67,19 +67,6 @@ struct Constants {
         static let balances = "balances"
     }
 
-    // MARK: - Firebase (Legacy - for backwards compatibility)
-    struct Firebase {
-        static let usersCollection = "users"
-        static let housesCollection = "houses"
-        static let invitesCollection = "invites"
-        static let membersCollection = "members"
-        static let messagesCollection = "messages"
-        static let expensesCollection = "expenses"
-        static let paymentsCollection = "payments"
-        static let choresCollection = "chores"
-        static let balancesCollection = "balances"
-    }
-
     // MARK: - User Defaults Keys
     struct UserDefaults {
         static let hasCompletedOnboarding = "hasCompletedOnboarding"

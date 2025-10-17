@@ -1,10 +1,13 @@
 import SwiftUI
+import OSLog
 
 struct MessagesView: View {
     @EnvironmentObject var firestoreService: FirestoreService
     @StateObject private var authService = AuthService.shared
     @State private var messageTab = 0
     @Binding var selectedTab: Int
+
+    private let logger = Logger(subsystem: "com.homi.app", category: "MessagesView")
 
     var body: some View {
         NavigationStack {
@@ -109,7 +112,7 @@ struct MessagesView: View {
                     }
                 }
             } catch {
-                print("Error loading house: \(error)")
+                logger.error("Error loading house: \(error.localizedDescription)")
             }
         }
     }

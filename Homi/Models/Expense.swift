@@ -3,7 +3,10 @@ import FirebaseFirestore
 
 // MARK: - Expense Model
 
-struct Expense: Identifiable, Codable {
+struct Expense: Identifiable, Codable, Equatable {
+    static func == (lhs: Expense, rhs: Expense) -> Bool {
+        lhs.id == rhs.id && lhs.isSettled == rhs.isSettled
+    }
     let id: String
     let houseId: String
     let amount: Double
@@ -101,6 +104,10 @@ struct Expense: Identifiable, Codable {
         return String(format: "$%.2f", amount)
     }
 
+    func formattedAmount(currency: String) -> String {
+        return CurrencyFormatter.format(amount: amount, currencyCode: currency)
+    }
+
     var formattedDate: String {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
@@ -145,6 +152,10 @@ struct ExpenseSplit: Codable, Identifiable {
 
     var formattedAmount: String {
         return String(format: "$%.2f", amount)
+    }
+
+    func formattedAmount(currency: String) -> String {
+        return CurrencyFormatter.format(amount: amount, currencyCode: currency)
     }
 }
 
@@ -276,6 +287,10 @@ struct Payment: Identifiable, Codable {
         return String(format: "$%.2f", amount)
     }
 
+    func formattedAmount(currency: String) -> String {
+        return CurrencyFormatter.format(amount: amount, currencyCode: currency)
+    }
+
     var formattedDate: String {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
@@ -299,6 +314,11 @@ struct Balance: Identifiable {
     var formattedBalance: String {
         let amount = abs(netBalance)
         return String(format: "$%.2f", amount)
+    }
+
+    func formattedBalance(currency: String) -> String {
+        let amount = abs(netBalance)
+        return CurrencyFormatter.format(amount: amount, currencyCode: currency)
     }
 
     var balanceDescription: String {

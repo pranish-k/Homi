@@ -29,7 +29,7 @@ class FirestoreService: ObservableObject {
 
     func createUser(_ user: User) async throws {
         do {
-            try await db.collection(Constants.Firebase.usersCollection)
+            try await db.collection(Constants.Collections.users)
                 .document(user.id)
                 .setData(user.toFirestore)
         } catch {
@@ -40,7 +40,7 @@ class FirestoreService: ObservableObject {
 
     func getUser(id: String) async throws -> User? {
         do {
-            let document = try await db.collection(Constants.Firebase.usersCollection)
+            let document = try await db.collection(Constants.Collections.users)
                 .document(id)
                 .getDocument()
 
@@ -53,7 +53,7 @@ class FirestoreService: ObservableObject {
 
     func updateUser(id: String, data: [String: Any]) async throws {
         do {
-            try await db.collection(Constants.Firebase.usersCollection)
+            try await db.collection(Constants.Collections.users)
                 .document(id)
                 .updateData(data)
         } catch {
@@ -70,7 +70,7 @@ class FirestoreService: ObservableObject {
         }
 
         let inviteCode = generateInviteCode()
-        let houseId = db.collection(Constants.Firebase.housesCollection).document().documentID
+        let houseId = db.collection(Constants.Collections.houses).document().documentID
 
         let house = House(
             id: houseId,
@@ -83,7 +83,7 @@ class FirestoreService: ObservableObject {
 
         do {
             // Create house document
-            try await db.collection(Constants.Firebase.housesCollection)
+            try await db.collection(Constants.Collections.houses)
                 .document(houseId)
                 .setData(house.toFirestore)
 
@@ -97,7 +97,7 @@ class FirestoreService: ObservableObject {
                 "currentUses": 0
             ]
 
-            try await db.collection(Constants.Firebase.invitesCollection)
+            try await db.collection(Constants.Collections.invites)
                 .document(inviteCode)
                 .setData(inviteData)
 
@@ -111,9 +111,9 @@ class FirestoreService: ObservableObject {
                 "locationSharing": false
             ]
 
-            try await db.collection(Constants.Firebase.housesCollection)
+            try await db.collection(Constants.Collections.houses)
                 .document(houseId)
-                .collection(Constants.Firebase.membersCollection)
+                .collection(Constants.Collections.members)
                 .document(userId)
                 .setData(memberData)
 
@@ -136,7 +136,7 @@ class FirestoreService: ObservableObject {
 
         do {
             // Get invite document
-            let inviteDoc = try await db.collection(Constants.Firebase.invitesCollection)
+            let inviteDoc = try await db.collection(Constants.Collections.invites)
                 .document(inviteCode.uppercased())
                 .getDocument()
 
@@ -153,7 +153,7 @@ class FirestoreService: ObservableObject {
             }
 
             // Get house document
-            let houseDoc = try await db.collection(Constants.Firebase.housesCollection)
+            let houseDoc = try await db.collection(Constants.Collections.houses)
                 .document(houseId)
                 .getDocument()
 
@@ -176,7 +176,7 @@ class FirestoreService: ObservableObject {
             batch.updateData([
                 "memberIds": updatedMemberIds,
                 "memberCount": FieldValue.increment(Int64(1))
-            ], forDocument: db.collection(Constants.Firebase.housesCollection).document(houseId))
+            ], forDocument: db.collection(Constants.Collections.houses).document(houseId))
 
             // Add user as member
             let memberData: [String: Any] = [
@@ -188,18 +188,18 @@ class FirestoreService: ObservableObject {
                 "locationSharing": false
             ]
 
-            batch.setData(memberData, forDocument: db.collection(Constants.Firebase.housesCollection)
+            batch.setData(memberData, forDocument: db.collection(Constants.Collections.houses)
                 .document(houseId)
-                .collection(Constants.Firebase.membersCollection)
+                .collection(Constants.Collections.members)
                 .document(userId))
 
             // Update user's currentHouseId
             batch.updateData(["currentHouseId": houseId],
-                           forDocument: db.collection(Constants.Firebase.usersCollection).document(userId))
+                           forDocument: db.collection(Constants.Collections.users).document(userId))
 
             // Update invite usage count
             batch.updateData(["currentUses": FieldValue.increment(Int64(1))],
-                           forDocument: db.collection(Constants.Firebase.invitesCollection).document(inviteCode.uppercased()))
+                           forDocument: db.collection(Constants.Collections.invites).document(inviteCode.uppercased()))
 
             // Commit batch
             try await batch.commit()
@@ -215,7 +215,7 @@ class FirestoreService: ObservableObject {
 
     func getHouse(id: String) async throws -> House? {
         do {
-            let document = try await db.collection(Constants.Firebase.housesCollection)
+            let document = try await db.collection(Constants.Collections.houses)
                 .document(id)
                 .getDocument()
 
@@ -228,9 +228,9 @@ class FirestoreService: ObservableObject {
 
     func getHouseMembers(houseId: String) async throws -> [HouseMember] {
         do {
-            let snapshot = try await db.collection(Constants.Firebase.housesCollection)
+            let snapshot = try await db.collection(Constants.Collections.houses)
                 .document(houseId)
-                .collection(Constants.Firebase.membersCollection)
+                .collection(Constants.Collections.members)
                 .getDocuments()
 
             let members = snapshot.documents.compactMap { document -> HouseMember? in
@@ -271,7 +271,7 @@ class FirestoreService: ObservableObject {
             let batch = db.batch()
 
             // Get house document
-            let houseDoc = try await db.collection(Constants.Firebase.housesCollection)
+            let houseDoc = try await db.collection(Constants.Collections.houses)
                 .document(houseId)
                 .getDocument()
 
@@ -282,9 +282,9 @@ class FirestoreService: ObservableObject {
             // Check if user is the last member
             if house.memberCount <= 1 {
                 // Delete the house if last member
-                batch.deleteDocument(db.collection(Constants.Firebase.housesCollection).document(houseId))
+                batch.deleteDocument(db.collection(Constants.Collections.houses).document(houseId))
                 // Delete the invite code
-                batch.deleteDocument(db.collection(Constants.Firebase.invitesCollection).document(house.inviteCode))
+                batch.deleteDocument(db.collection(Constants.Collections.invites).document(house.inviteCode))
             } else {
                 // Remove user from memberIds
                 var updatedMemberIds = house.memberIds
@@ -293,18 +293,18 @@ class FirestoreService: ObservableObject {
                 batch.updateData([
                     "memberIds": updatedMemberIds,
                     "memberCount": FieldValue.increment(Int64(-1))
-                ], forDocument: db.collection(Constants.Firebase.housesCollection).document(houseId))
+                ], forDocument: db.collection(Constants.Collections.houses).document(houseId))
 
                 // Remove member document
-                batch.deleteDocument(db.collection(Constants.Firebase.housesCollection)
+                batch.deleteDocument(db.collection(Constants.Collections.houses)
                     .document(houseId)
-                    .collection(Constants.Firebase.membersCollection)
+                    .collection(Constants.Collections.members)
                     .document(userId))
             }
 
             // Update user's currentHouseId to nil
             batch.updateData(["currentHouseId": FieldValue.delete()],
-                           forDocument: db.collection(Constants.Firebase.usersCollection).document(userId))
+                           forDocument: db.collection(Constants.Collections.users).document(userId))
 
             try await batch.commit()
 

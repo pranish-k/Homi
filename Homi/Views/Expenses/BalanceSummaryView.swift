@@ -4,6 +4,7 @@ struct BalanceSummaryView: View {
     let balances: [Balance]
     let totalYouOwe: Double
     let totalOwedToYou: Double
+    var currency: String = "USD"
     var onSettle: ((Balance) -> Void)?
 
     private var netBalance: Double {
@@ -190,7 +191,7 @@ struct BalanceSummaryView: View {
     }
 
     private func formattedAmount(_ amount: Double) -> String {
-        return String(format: "$%.2f", abs(amount))
+        return CurrencyFormatter.format(amount: abs(amount), currencyCode: currency)
     }
 }
 

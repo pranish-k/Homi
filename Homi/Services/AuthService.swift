@@ -4,6 +4,7 @@ import FirebaseAuth
 import FirebaseFirestore
 import AuthenticationServices
 import CryptoKit
+import OSLog
 
 @MainActor
 class AuthService: NSObject, ObservableObject {
@@ -18,6 +19,7 @@ class AuthService: NSObject, ObservableObject {
     private var authStateHandler: AuthStateDidChangeListenerHandle?
     private let auth = Auth.auth()
     private let db = Firestore.firestore()
+    private let logger = Logger(subsystem: "com.homi.app", category: "AuthService")
 
     // For Sign in with Apple
     private var currentNonce: String?
@@ -49,9 +51,9 @@ class AuthService: NSObject, ObservableObject {
         errorMessage = nil
 
         do {
-            print("Starting sign up for email: \(email)")
+            logger.info("Starting sign up for email: \(email)")
             let result = try await auth.createUser(withEmail: email, password: password)
-            print("Firebase Auth user created with ID: \(result.user.uid)")
+            logger.info("Firebase Auth user created with ID: \(result.user.uid)")
 
             // Create user profile
             let newUser = User(
@@ -65,11 +67,11 @@ class AuthService: NSObject, ObservableObject {
 
             // Send verification email
             try await result.user.sendEmailVerification()
-            print("Verification email sent")
+            logger.info("Verification email sent")
 
             isLoading = false
         } catch {
-            print("Sign up error: \(error)")
+            logger.error("Sign up error: \(error.localizedDescription)")
             isLoading = false
             errorMessage = error.localizedDescription
             throw error
@@ -81,17 +83,17 @@ class AuthService: NSObject, ObservableObject {
         errorMessage = nil
 
         do {
-            print("Signing in with email: \(email)")
+            logger.info("Signing in with email: \(email)")
             let result = try await auth.signIn(withEmail: email, password: password)
-            print("Auth successful for user ID: \(result.user.uid)")
+            logger.info("Auth successful for user ID: \(result.user.uid)")
 
             // Check if user profile exists, create if not
-            let userDoc = try await db.collection(Constants.Firebase.usersCollection)
+            let userDoc = try await db.collection(Constants.Collections.users)
                 .document(result.user.uid)
                 .getDocument()
 
             if !userDoc.exists {
-                print("User profile doesn't exist, creating one")
+                logger.info("User profile doesn't exist, creating one")
                 let newUser = User(
                     id: result.user.uid,
                     email: result.user.email ?? email,
@@ -105,7 +107,7 @@ class AuthService: NSObject, ObservableObject {
 
             isLoading = false
         } catch {
-            print("Sign in error: \(error)")
+            logger.error("Sign in error: \(error.localizedDescription)")
             isLoading = false
             errorMessage = error.localizedDescription
             throw error
@@ -127,7 +129,7 @@ class AuthService: NSObject, ObservableObject {
         } catch {
             isLoading = false
             errorMessage = "Phone authentication error: \(error.localizedDescription)"
-            print("Phone auth error: \(error)")
+            logger.error("Phone auth error: \(error.localizedDescription)")
             throw error
         }
     }
@@ -145,7 +147,7 @@ class AuthService: NSObject, ObservableObject {
             let result = try await auth.signIn(with: credential)
 
             // Check if user profile exists
-            let userDoc = try await db.collection(Constants.Firebase.usersCollection)
+            let userDoc = try await db.collection(Constants.Collections.users)
                 .document(result.user.uid)
                 .getDocument()
 
@@ -202,7 +204,7 @@ class AuthService: NSObject, ObservableObject {
             let result = try await auth.signIn(with: credential)
 
             // Check if user profile exists
-            let userDoc = try await db.collection(Constants.Firebase.usersCollection)
+            let userDoc = try await db.collection(Constants.Collections.users)
                 .document(result.user.uid)
                 .getDocument()
 
@@ -253,7 +255,9 @@ class AuthService: NSObject, ObservableObject {
                 var random: UInt8 = 0
                 let errorCode = SecRandomCopyBytes(kSecRandomDefault, 1, &random)
                 if errorCode != errSecSuccess {
-                    fatalError("Unable to generate nonce. SecRandomCopyBytes failed with OSStatus \(errorCode)")
+                    logger.error("Unable to generate nonce. SecRandomCopyBytes failed with OSStatus \(errorCode)")
+                    // Return a default nonce instead of crashing
+                    return 0
                 }
                 return random
             }
@@ -295,17 +299,17 @@ class AuthService: NSObject, ObservableObject {
 
     func createUserProfile(user: User) async throws {
         do {
-            print("Creating user profile for ID: \(user.id)")
-            print("User data: \(user.toFirestore)")
+            logger.info("Creating user profile for ID: \(user.id)")
+            logger.debug("User data: \(user.toFirestore.description)")
 
-            try await db.collection(Constants.Firebase.usersCollection)
+            try await db.collection(Constants.Collections.users)
                 .document(user.id)
                 .setData(user.toFirestore)
 
-            print("User profile created successfully")
+            logger.info("User profile created successfully")
             self.userProfile = user
         } catch {
-            print("Error creating user profile: \(error)")
+            logger.error("Error creating user profile: \(error.localizedDescription)")
             errorMessage = error.localizedDescription
             throw error
         }
@@ -329,7 +333,7 @@ class AuthService: NSObject, ObservableObject {
         updateData["lastSeen"] = Timestamp(date: Date())
 
         do {
-            try await db.collection(Constants.Firebase.usersCollection)
+            try await db.collection(Constants.Collections.users)
                 .document(userId)
                 .updateData(updateData)
 
@@ -342,7 +346,7 @@ class AuthService: NSObject, ObservableObject {
 
     private func fetchUserProfile(userId: String) async {
         do {
-            let document = try await db.collection(Constants.Firebase.usersCollection)
+            let document = try await db.collection(Constants.Collections.users)
                 .document(userId)
                 .getDocument()
 
@@ -350,7 +354,7 @@ class AuthService: NSObject, ObservableObject {
                 self.userProfile = user
             }
         } catch {
-            print("Error fetching user profile: \(error)")
+            logger.error("Error fetching user profile: \(error.localizedDescription)")
             errorMessage = error.localizedDescription
         }
     }

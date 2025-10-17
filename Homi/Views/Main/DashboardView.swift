@@ -1,5 +1,6 @@
 import SwiftUI
 import FirebaseAuth
+import OSLog
 
 struct DashboardView: View {
     @StateObject private var authService = AuthService.shared
@@ -7,6 +8,8 @@ struct DashboardView: View {
     @State private var currentHouse: House?
     @State private var houseMembers: [HouseMember] = []
     @State private var isLoading = true
+
+    private let logger = Logger(subsystem: "com.homi.app", category: "DashboardView")
 
     var body: some View {
         NavigationView {
@@ -163,7 +166,7 @@ struct DashboardView: View {
                             do {
                                 try authService.signOut()
                             } catch {
-                                print("Error signing out: \(error)")
+                                logger.error("Error signing out: \(error.localizedDescription)")
                             }
                         }) {
                             Label("Sign Out", systemImage: "arrow.right.square")
@@ -187,7 +190,7 @@ struct DashboardView: View {
             currentHouse = try await firestoreService.getHouse(id: houseId)
             houseMembers = try await firestoreService.getHouseMembers(houseId: houseId)
         } catch {
-            print("Error loading house data: \(error)")
+            logger.error("Error loading house data: \(error.localizedDescription)")
         }
 
         isLoading = false

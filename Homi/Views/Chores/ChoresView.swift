@@ -1,4 +1,5 @@
 import SwiftUI
+import OSLog
 
 struct ChoresView: View {
     @StateObject private var viewModel = ChoreViewModel()
@@ -7,6 +8,8 @@ struct ChoresView: View {
     @State private var showingAddChore = false
     @State private var selectedFilter: ChoreFilter = .all
     @State private var houseMembers: [HouseMember] = []
+
+    private let logger = Logger(subsystem: "com.homi.app", category: "ChoresView")
 
     var currentUserId: String? {
         authService.userProfile?.id
@@ -218,7 +221,7 @@ struct ChoresView: View {
         do {
             houseMembers = try await FirestoreService.shared.getHouseMembers(houseId: houseId)
         } catch {
-            print("Error loading house members: \(error.localizedDescription)")
+            logger.error("Error loading house members: \(error.localizedDescription)")
         }
 
         // Start listening to chores

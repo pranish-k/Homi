@@ -35,6 +35,22 @@ struct ChoreCardView: View {
 
                 Spacer()
 
+                // Completion button (visible for assigned user)
+                if isAssignedToCurrentUser {
+                    Button(action: {
+                        if chore.isCompleted {
+                            onUncomplete?()
+                        } else {
+                            onComplete?()
+                        }
+                    }) {
+                        Image(systemName: chore.isCompleted ? "checkmark.circle.fill" : "circle")
+                            .font(.title2)
+                            .foregroundColor(chore.isCompleted ? Constants.Colors.success : Constants.Colors.textSecondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+
                 // Points badge
                 if chore.points > 0 {
                     HStack(spacing: 4) {
@@ -154,6 +170,36 @@ struct ChoreCardView: View {
             RoundedRectangle(cornerRadius: Constants.CornerRadius.medium)
                 .stroke(chore.isOverdue ? Constants.Colors.danger.opacity(0.3) : Color.clear, lineWidth: 2)
         )
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            // Only show swipe actions for assigned user
+            if isAssignedToCurrentUser {
+                if chore.isCompleted {
+                    Button {
+                        onUncomplete?()
+                    } label: {
+                        Label("Undo", systemImage: "arrow.uturn.backward")
+                    }
+                    .tint(.orange)
+                } else {
+                    Button {
+                        onComplete?()
+                    } label: {
+                        Label("Complete", systemImage: "checkmark")
+                    }
+                    .tint(Constants.Colors.success)
+                }
+            }
+        }
+        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+            // Delete action on leading edge (only for creator)
+            if chore.createdBy == currentUserId {
+                Button(role: .destructive) {
+                    onDelete?()
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
+        }
         .contextMenu {
             if !chore.isCompleted && isAssignedToCurrentUser {
                 Button {

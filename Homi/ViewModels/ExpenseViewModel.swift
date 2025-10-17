@@ -55,10 +55,29 @@ class ExpenseViewModel: ObservableObject {
         expenseService.startListeningToPayments(houseId: houseId)
 
         // Calculate balances whenever expenses change
+        // Use debounce to avoid recalculating on every single change
+        // Use removeDuplicates to skip if expenses array hasn't actually changed
         expenseService.$expenses
+            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
+            .removeDuplicates(by: { oldExpenses, newExpenses in
+                // Only recalculate if the unsettled expenses have actually changed
+                let oldUnsettled = oldExpenses.filter { !$0.isSettled }
+                let newUnsettled = newExpenses.filter { !$0.isSettled }
+                return oldUnsettled.count == newUnsettled.count &&
+                       oldUnsettled.map(\.id).sorted() == newUnsettled.map(\.id).sorted()
+            })
             .sink { [weak self] _ in
                 guard let self = self, let userId = self.currentUserId else { return }
-                self.balances = self.expenseService.calculateBalances(currentUserId: userId, houseMembers: houseMembers)
+                // Perform calculation off the main thread, then update UI on main thread
+                Task.detached(priority: .userInitiated) {
+                    let balances = await self.expenseService.calculateBalances(
+                        currentUserId: userId,
+                        houseMembers: houseMembers
+                    )
+                    await MainActor.run {
+                        self.balances = balances
+                    }
+                }
             }
             .store(in: &cancellables)
     }

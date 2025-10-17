@@ -1,10 +1,13 @@
 import SwiftUI
 import FirebaseAuth
+import OSLog
 
 struct ContentView: View {
     @StateObject private var authService = AuthService.shared
     @StateObject private var authViewModel = AuthViewModel()
     @StateObject private var firestoreService = FirestoreService.shared
+
+    private let logger = Logger(subsystem: "com.homi.app", category: "ContentView")
 
     var body: some View {
         Group {
@@ -40,7 +43,7 @@ struct ContentView: View {
                 }
             }
         } catch {
-            print("Error fetching user profile: \(error)")
+            logger.error("Error fetching user profile: \(error.localizedDescription)")
         }
     }
 }
@@ -111,7 +114,7 @@ struct MainTabView: View {
                 }
                 .tag(2)
 
-            PlaceholderView(title: "Location", icon: "location.fill", color: Constants.Colors.warning)
+            LocationView()
                 .tabItem {
                     Label("Location", systemImage: "location")
                 }

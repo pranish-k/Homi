@@ -2,6 +2,7 @@ import Foundation
 import Combine
 import FirebaseFirestore
 import FirebaseAuth
+import OSLog
 
 @MainActor
 class MessagingService: ObservableObject {
@@ -9,6 +10,7 @@ class MessagingService: ObservableObject {
 
     private let db = Firestore.firestore()
     private let auth = Auth.auth()
+    private let logger = Logger(subsystem: "com.homi.app", category: "MessagingService")
 
     @Published var messages: [Message] = []
     @Published var isLoading = false
@@ -40,9 +42,9 @@ class MessagingService: ObservableObject {
         )
 
         do {
-            try await db.collection(Constants.Firebase.housesCollection)
+            try await db.collection(Constants.Collections.houses)
                 .document(houseId)
-                .collection(Constants.Firebase.messagesCollection)
+                .collection(Constants.Collections.messages)
                 .document(message.id)
                 .setData(message.toFirestore)
         } catch {
@@ -60,9 +62,9 @@ class MessagingService: ObservableObject {
         )
 
         do {
-            try await db.collection(Constants.Firebase.housesCollection)
+            try await db.collection(Constants.Collections.houses)
                 .document(houseId)
-                .collection(Constants.Firebase.messagesCollection)
+                .collection(Constants.Collections.messages)
                 .document(message.id)
                 .setData(message.toFirestore)
         } catch {
@@ -79,9 +81,9 @@ class MessagingService: ObservableObject {
 
         isLoading = true
 
-        messagesListener = db.collection(Constants.Firebase.housesCollection)
+        messagesListener = db.collection(Constants.Collections.houses)
             .document(houseId)
-            .collection(Constants.Firebase.messagesCollection)
+            .collection(Constants.Collections.messages)
             .order(by: "timestamp", descending: false)
             .limit(toLast: 100) // Load last 100 messages
             .addSnapshotListener { [weak self] snapshot, error in
@@ -128,9 +130,9 @@ class MessagingService: ObservableObject {
             var updatedReadBy = message.readBy
             updatedReadBy.append(userId)
 
-            let messageRef = db.collection(Constants.Firebase.housesCollection)
+            let messageRef = db.collection(Constants.Collections.houses)
                 .document(houseId)
-                .collection(Constants.Firebase.messagesCollection)
+                .collection(Constants.Collections.messages)
                 .document(message.id)
 
             batch.updateData(["readBy": updatedReadBy], forDocument: messageRef)
@@ -146,7 +148,7 @@ class MessagingService: ObservableObject {
             do {
                 try await batch.commit()
             } catch {
-                print("Error marking messages as read: \(error.localizedDescription)")
+                logger.error("Error marking messages as read: \(error.localizedDescription)")
             }
         }
     }
@@ -155,9 +157,9 @@ class MessagingService: ObservableObject {
 
     func loadMoreMessages(houseId: String, before timestamp: Date) async throws -> [Message] {
         do {
-            let snapshot = try await db.collection(Constants.Firebase.housesCollection)
+            let snapshot = try await db.collection(Constants.Collections.houses)
                 .document(houseId)
-                .collection(Constants.Firebase.messagesCollection)
+                .collection(Constants.Collections.messages)
                 .order(by: "timestamp", descending: true)
                 .start(after: [Timestamp(date: timestamp)])
                 .limit(to: 50)
@@ -179,9 +181,9 @@ class MessagingService: ObservableObject {
         }
 
         // Get the message to check if user is the sender
-        let messageRef = db.collection(Constants.Firebase.housesCollection)
+        let messageRef = db.collection(Constants.Collections.houses)
             .document(houseId)
-            .collection(Constants.Firebase.messagesCollection)
+            .collection(Constants.Collections.messages)
             .document(messageId)
 
         let document = try await messageRef.getDocument()
@@ -204,9 +206,9 @@ class MessagingService: ObservableObject {
             return 0
         }
 
-        let snapshot = try await db.collection(Constants.Firebase.housesCollection)
+        let snapshot = try await db.collection(Constants.Collections.houses)
             .document(houseId)
-            .collection(Constants.Firebase.messagesCollection)
+            .collection(Constants.Collections.messages)
             .order(by: "timestamp", descending: true)
             .limit(to: 100)
             .getDocuments()

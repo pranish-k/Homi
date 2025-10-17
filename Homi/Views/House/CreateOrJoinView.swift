@@ -1,8 +1,11 @@
 import SwiftUI
+import OSLog
 
 struct CreateOrJoinView: View {
     @ObservedObject var viewModel: HouseViewModel
     @StateObject private var authService = AuthService.shared
+
+    private let logger = Logger(subsystem: "com.homi.app", category: "CreateOrJoinView")
 
     var body: some View {
         VStack(spacing: 0) {
@@ -93,7 +96,7 @@ struct CreateOrJoinView: View {
                 do {
                     try authService.signOut()
                 } catch {
-                    print("Error signing out: \(error)")
+                    logger.error("Error signing out: \(error.localizedDescription)")
                 }
             }) {
                 Text("Sign Out")

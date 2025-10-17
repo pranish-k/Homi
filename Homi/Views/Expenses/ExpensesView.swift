@@ -1,4 +1,5 @@
 import SwiftUI
+import OSLog
 
 struct ExpensesView: View {
     @StateObject private var viewModel = ExpenseViewModel()
@@ -10,6 +11,13 @@ struct ExpensesView: View {
     @State private var houseMembers: [HouseMember] = []
     @State private var selectedBalance: Balance?
     @State private var showingSettlePayment = false
+    @State private var currentHouse: House?
+
+    private let logger = Logger(subsystem: "com.homi.app", category: "ExpensesView")
+
+    private var currency: String {
+        currentHouse?.settings.currency ?? "USD"
+    }
 
     var body: some View {
         NavigationStack {
@@ -107,6 +115,7 @@ struct ExpensesView: View {
                 balances: viewModel.balances,
                 totalYouOwe: viewModel.getTotalYouOwe(),
                 totalOwedToYou: viewModel.getTotalOwedToYou(),
+                currency: currency,
                 onSettle: { balance in
                     selectedBalance = balance
                     showingSettlePayment = true
@@ -178,6 +187,13 @@ struct ExpensesView: View {
 
         Task {
             do {
+                // Load house
+                if let house = try await firestoreService.getHouse(id: houseId) {
+                    await MainActor.run {
+                        currentHouse = house
+                    }
+                }
+
                 // Load house members
                 let members = try await firestoreService.getHouseMembers(houseId: houseId)
                 await MainActor.run {
@@ -187,7 +203,7 @@ struct ExpensesView: View {
                 // Start listening to expenses
                 viewModel.startListening(houseId: houseId, houseMembers: members)
             } catch {
-                print("Error loading data: \(error)")
+                logger.error("Error loading data: \(error.localizedDescription)")
             }
         }
     }
