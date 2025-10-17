@@ -3,148 +3,73 @@ import FirebaseAuth
 import OSLog
 
 struct DashboardView: View {
+    @Binding var selectedTab: Int
+    @StateObject private var viewModel = DashboardViewModel()
     @StateObject private var authService = AuthService.shared
-    @StateObject private var firestoreService = FirestoreService.shared
-    @State private var currentHouse: House?
-    @State private var houseMembers: [HouseMember] = []
-    @State private var isLoading = true
 
     private let logger = Logger(subsystem: "com.homi.app", category: "DashboardView")
 
     var body: some View {
         NavigationView {
-            ScrollView {
+            ScrollView(showsIndicators: false) {
                 VStack(spacing: Constants.Spacing.large) {
                     // House Header
-                    if let house = currentHouse {
-                        VStack(spacing: Constants.Spacing.medium) {
-                            HStack {
-                                VStack(alignment: .leading, spacing: Constants.Spacing.xSmall) {
-                                    Text(house.name)
-                                        .font(.largeTitle)
-                                        .fontWeight(.bold)
-
-                                    if let address = house.address {
-                                        Text(address)
-                                            .font(.caption)
-                                            .foregroundColor(Constants.Colors.textSecondary)
-                                    }
-                                }
-
-                                Spacer()
-
-                                // Invite Code Button
-                                Button(action: {
-                                    UIPasteboard.general.string = house.inviteCode
-                                }) {
-                                    VStack(spacing: 4) {
-                                        Image(systemName: "square.and.arrow.up")
-                                            .font(.title3)
-                                        Text(house.inviteCode)
-                                            .font(.caption2)
-                                            .fontWeight(.semibold)
-                                    }
-                                    .foregroundColor(Constants.Colors.primary)
-                                }
-                            }
-                            .padding(.horizontal, Constants.Spacing.large)
-
-                            // Member Avatars
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: Constants.Spacing.medium) {
-                                    ForEach(houseMembers) { member in
-                                        MemberAvatarView(member: member)
-                                    }
-
-                                    // Add Member Button
-                                    Button(action: shareInvite) {
-                                        VStack {
-                                            ZStack {
-                                                Circle()
-                                                    .fill(Color(.secondarySystemBackground))
-                                                    .frame(width: 60, height: 60)
-
-                                                Image(systemName: "person.badge.plus")
-                                                    .font(.title3)
-                                                    .foregroundColor(Constants.Colors.primary)
-                                            }
-
-                                            Text("Invite")
-                                                .font(.caption)
-                                                .foregroundColor(Constants.Colors.textSecondary)
-                                        }
-                                    }
-                                }
-                                .padding(.horizontal, Constants.Spacing.large)
-                            }
-                        }
-                        .padding(.vertical, Constants.Spacing.medium)
+                    if let house = viewModel.currentHouse {
+                        HouseHeaderCard(
+                            house: house,
+                            members: viewModel.houseMembers,
+                            onShareInvite: viewModel.shareInvite
+                        )
                     }
 
-                    // Quick Stats
-                    VStack(spacing: Constants.Spacing.medium) {
-                        Text("Quick Overview")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, Constants.Spacing.large)
+                    // Quick Stats Grid
+                    QuickStatsGrid(viewModel: viewModel)
 
-                        LazyVGrid(columns: [
-                            GridItem(.flexible()),
-                            GridItem(.flexible())
-                        ], spacing: Constants.Spacing.medium) {
-                            QuickStatCard(
-                                icon: "dollarsign.circle.fill",
-                                title: "Bills",
-                                value: "Coming Soon",
-                                color: Constants.Colors.success
-                            )
+                    // Quick Actions
+                    QuickActionsCard(
+                        onAddExpense: { selectedTab = 2 },
+                        onAddChore: { selectedTab = 4 },
+                        onSendMessage: { selectedTab = 1 }
+                    )
+                    .padding(.horizontal, Constants.Spacing.medium)
 
-                            QuickStatCard(
-                                icon: "checklist",
-                                title: "Chores",
-                                value: "Coming Soon",
-                                color: Constants.Colors.primary
-                            )
-
-                            QuickStatCard(
-                                icon: "message.fill",
-                                title: "Messages",
-                                value: "Coming Soon",
-                                color: Constants.Colors.warning
-                            )
-
-                            QuickStatCard(
-                                icon: "location.fill",
-                                title: "Location",
-                                value: "Coming Soon",
-                                color: Constants.Colors.danger
-                            )
-                        }
-                        .padding(.horizontal, Constants.Spacing.large)
+                    // Upcoming Chores Widget
+                    if !viewModel.upcomingChores.isEmpty {
+                        UpcomingChoresWidget(
+                            chores: viewModel.upcomingChores,
+                            overdueCount: viewModel.overdueChoresCount,
+                            dueTodayCount: viewModel.dueTodayChoresCount,
+                            onTap: { selectedTab = 4 }
+                        )
+                        .padding(.horizontal, Constants.Spacing.medium)
                     }
 
-                    // Recent Activity
-                    VStack(spacing: Constants.Spacing.medium) {
-                        Text("Recent Activity")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, Constants.Spacing.large)
+                    // Balance Summary Widget
+                    BalanceSummaryWidget(
+                        balance: viewModel.myBalance,
+                        balanceText: viewModel.balanceText,
+                        balanceColor: viewModel.balanceColor,
+                        onTap: { selectedTab = 2 }
+                    )
+                    .padding(.horizontal, Constants.Spacing.medium)
 
-                        VStack(spacing: Constants.Spacing.small) {
-                            ActivityRow(
-                                icon: "person.badge.plus",
-                                text: "You created the house",
-                                time: "Just now",
-                                color: Constants.Colors.success
-                            )
-
-                            Text("More features coming in Phase 3!")
-                                .font(.caption)
-                                .foregroundColor(Constants.Colors.textSecondary)
-                                .padding(.vertical, Constants.Spacing.large)
-                        }
-                        .padding(.horizontal, Constants.Spacing.large)
+                    // Recent Messages Widget
+                    if !viewModel.recentMessages.isEmpty {
+                        RecentMessagesWidget(
+                            messages: viewModel.recentMessages,
+                            unreadCount: viewModel.unreadMessagesCount,
+                            onTap: { selectedTab = 1 }
+                        )
+                        .padding(.horizontal, Constants.Spacing.medium)
                     }
+
+                    // Location Status
+                    LocationStatusCard(
+                        activeMembersCount: viewModel.activeSharingMembers,
+                        isSharing: LocationService.shared.isLocationSharingEnabled,
+                        onTap: { selectedTab = 3 }
+                    )
+                    .padding(.horizontal, Constants.Spacing.medium)
                 }
                 .padding(.vertical, Constants.Spacing.medium)
             }
@@ -177,61 +102,170 @@ struct DashboardView: View {
                     }
                 }
             }
+            .refreshable {
+                await viewModel.loadData()
+            }
         }
         .task {
-            await loadHouseData()
+            await viewModel.loadData()
         }
-    }
-
-    private func loadHouseData() async {
-        guard let houseId = authService.userProfile?.currentHouseId else { return }
-
-        do {
-            currentHouse = try await firestoreService.getHouse(id: houseId)
-            houseMembers = try await firestoreService.getHouseMembers(houseId: houseId)
-        } catch {
-            logger.error("Error loading house data: \(error.localizedDescription)")
+        .onDisappear {
+            viewModel.cleanup()
         }
-
-        isLoading = false
-    }
-
-    private func shareInvite() {
-        guard let house = currentHouse else { return }
-
-        let message = """
-        Join our house "\(house.name)" on Homi! 🏠
-
-        Use this invite code: \(house.inviteCode)
-
-        Download Homi to stay organized with your housemates!
-        """
-
-        let activityVC = UIActivityViewController(
-            activityItems: [message],
-            applicationActivities: nil
-        )
-
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let window = windowScene.windows.first {
-            window.rootViewController?.present(activityVC, animated: true)
+        .onChange(of: selectedTab) { _, newValue in
+            // This binding allows widgets to change tabs
         }
     }
 }
+
+// MARK: - House Header Card
+
+struct HouseHeaderCard: View {
+    let house: House
+    let members: [HouseMember]
+    let onShareInvite: () -> Void
+
+    var body: some View {
+        VStack(spacing: Constants.Spacing.medium) {
+            HStack {
+                VStack(alignment: .leading, spacing: Constants.Spacing.xSmall) {
+                    Text(house.name)
+                        .font(.title2)
+                        .fontWeight(.bold)
+
+                    if let address = house.address {
+                        Text(address)
+                            .font(.caption)
+                            .foregroundColor(Constants.Colors.textSecondary)
+                    }
+                }
+
+                Spacer()
+
+                // Invite Code Button
+                Button(action: {
+                    UIPasteboard.general.string = house.inviteCode
+                }) {
+                    VStack(spacing: 4) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.title3)
+                        Text(house.inviteCode)
+                            .font(.caption2)
+                            .fontWeight(.semibold)
+                    }
+                    .foregroundColor(Constants.Colors.primary)
+                }
+            }
+
+            // Member Avatars
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: Constants.Spacing.medium) {
+                    ForEach(members) { member in
+                        MemberAvatarView(member: member)
+                    }
+
+                    // Add Member Button
+                    Button(action: onShareInvite) {
+                        VStack {
+                            ZStack {
+                                Circle()
+                                    .fill(Color(UIColor.tertiarySystemBackground))
+                                    .frame(width: 50, height: 50)
+
+                                Image(systemName: "person.badge.plus")
+                                    .font(.body)
+                                    .foregroundColor(Constants.Colors.primary)
+                            }
+
+                            Text("Invite")
+                                .font(.caption)
+                                .foregroundColor(Constants.Colors.textSecondary)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(Constants.Spacing.medium)
+        .background(Color(UIColor.secondarySystemBackground))
+        .cornerRadius(Constants.CornerRadius.medium)
+        .padding(.horizontal, Constants.Spacing.medium)
+    }
+}
+
+// MARK: - Quick Stats Grid
+
+struct QuickStatsGrid: View {
+    @ObservedObject var viewModel: DashboardViewModel
+
+    var body: some View {
+        LazyVGrid(columns: [
+            GridItem(.flexible()),
+            GridItem(.flexible())
+        ], spacing: Constants.Spacing.medium) {
+            QuickStatCard(
+                icon: "dollarsign.circle.fill",
+                title: "Balance",
+                value: viewModel.balanceText,
+                color: viewModel.balanceColor
+            )
+
+            QuickStatCard(
+                icon: "checklist",
+                title: "Due Today",
+                value: "\(viewModel.dueTodayChoresCount)",
+                color: Constants.Colors.primary
+            )
+
+            QuickStatCard(
+                icon: "message.fill",
+                title: "Unread",
+                value: "\(viewModel.unreadMessagesCount)",
+                color: Constants.Colors.warning
+            )
+
+            QuickStatCard(
+                icon: "location.fill",
+                title: "Sharing",
+                value: "\(viewModel.activeSharingMembers)",
+                color: Constants.Colors.success
+            )
+        }
+        .padding(.horizontal, Constants.Spacing.medium)
+    }
+}
+
+// MARK: - Member Avatar View
 
 struct MemberAvatarView: View {
     let member: HouseMember
 
     var body: some View {
-        VStack {
-            ZStack {
+        VStack(spacing: Constants.Spacing.xSmall) {
+            if let photoURL = member.profilePhotoUrl, let url = URL(string: photoURL) {
+                AsyncImage(url: url) { image in
+                    image
+                        .resizable()
+                        .scaledToFill()
+                } placeholder: {
+                    Circle()
+                        .fill(Color(UIColor.tertiarySystemBackground))
+                        .overlay(
+                            Text(member.displayName.prefix(2).uppercased())
+                                .font(.caption)
+                                .foregroundColor(Constants.Colors.primary)
+                        )
+                }
+                .frame(width: 50, height: 50)
+                .clipShape(Circle())
+            } else {
                 Circle()
-                    .fill(Color(.secondarySystemBackground))
-                    .frame(width: 60, height: 60)
-
-                Text(member.displayName.prefix(2).uppercased())
-                    .font(.headline)
-                    .foregroundColor(Constants.Colors.primary)
+                    .fill(Color(UIColor.tertiarySystemBackground))
+                    .frame(width: 50, height: 50)
+                    .overlay(
+                        Text(member.displayName.prefix(2).uppercased())
+                            .font(.caption)
+                            .foregroundColor(Constants.Colors.primary)
+                    )
             }
 
             Text(member.displayName.components(separatedBy: " ").first ?? member.displayName)
@@ -241,6 +275,8 @@ struct MemberAvatarView: View {
         }
     }
 }
+
+// MARK: - Quick Stat Card
 
 struct QuickStatCard: View {
     let icon: String
@@ -263,39 +299,18 @@ struct QuickStatCard: View {
                 .foregroundColor(Constants.Colors.textSecondary)
 
             Text(value)
-                .font(.headline)
+                .font(.title3)
+                .fontWeight(.semibold)
                 .foregroundColor(Constants.Colors.textPrimary)
         }
         .padding(Constants.Spacing.medium)
-        .background(Color(.secondarySystemBackground))
+        .background(Color(UIColor.secondarySystemBackground))
         .cornerRadius(Constants.CornerRadius.medium)
     }
 }
 
-struct ActivityRow: View {
-    let icon: String
-    let text: String
-    let time: String
-    let color: Color
+// MARK: - Preview
 
-    var body: some View {
-        HStack(spacing: Constants.Spacing.medium) {
-            Image(systemName: icon)
-                .font(.body)
-                .foregroundColor(color)
-                .frame(width: 30)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(text)
-                    .font(.subheadline)
-
-                Text(time)
-                    .font(.caption)
-                    .foregroundColor(Constants.Colors.textSecondary)
-            }
-
-            Spacer()
-        }
-        .padding(.vertical, Constants.Spacing.small)
-    }
+#Preview {
+    DashboardView(selectedTab: .constant(0))
 }
