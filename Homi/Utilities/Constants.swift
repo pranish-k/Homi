@@ -20,6 +20,7 @@ struct Constants {
         static let success = Color(hex: "34C759")
         static let warning = Color(hex: "FF9500")
         static let danger = Color(hex: "FF3B30")
+        static let error = Color(hex: "FF3B30") // Same as danger
 
         // Background colors
         static let background = Color(uiColor: .systemBackground)
@@ -162,6 +163,7 @@ struct Constants {
         static let balances = "balances"
         static let conversations = "conversations"
         static let directMessages = "directMessages"
+        static let nudges = "nudges"
     }
 
     // MARK: - User Defaults Keys

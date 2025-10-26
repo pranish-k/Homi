@@ -1,215 +1,153 @@
 import SwiftUI
 
+// MARK: - Redesigned Balance Summary (Individual Balances Only)
+
 struct BalanceSummaryView: View {
     let balances: [Balance]
     let totalYouOwe: Double
     let totalOwedToYou: Double
     var currency: String = "USD"
     var onSettle: ((Balance) -> Void)?
+    var onViewHistory: (() -> Void)?
 
     private var netBalance: Double {
         totalOwedToYou - totalYouOwe
     }
 
     var body: some View {
-        VStack(spacing: Constants.Spacing.medium) {
-            // Overall balance card
-            overallBalanceCard
-
-            // Individual balances
+        VStack(spacing: Constants.Spacing.large) {
+            // Individual Balances (Primary Content)
             if !balances.isEmpty {
                 VStack(spacing: Constants.Spacing.small) {
                     ForEach(balances) { balance in
-                        balanceRow(balance: balance)
+                        BalancePersonCard(
+                            balance: balance,
+                            currency: currency,
+                            onSettle: { onSettle?(balance) }
+                        )
                     }
                 }
-            } else if totalYouOwe == 0 && totalOwedToYou == 0 {
-                // Only show empty state when truly no balances at all
-                emptyStateView
             } else {
-                // If we have totals but no individual balances, something's wrong
-                // Show a message for debugging
-                Text("Balances are being calculated...")
-                    .font(.caption)
-                    .foregroundColor(Constants.Colors.textSecondary)
-                    .padding()
-            }
-        }
-    }
-
-    private var overallBalanceCard: some View {
-        VStack(spacing: Constants.Spacing.small) {
-            Text("Your Balance")
-                .font(.headline)
-                .foregroundColor(Constants.Colors.textSecondary)
-
-            Text(formattedAmount(netBalance))
-                .font(.system(size: 36, weight: .bold))
-                .foregroundColor(balanceColor)
-
-            if netBalance > 0 {
-                Text("You are owed")
-                    .font(.subheadline)
-                    .foregroundColor(Constants.Colors.textSecondary)
-            } else if netBalance < 0 {
-                Text("You owe")
-                    .font(.subheadline)
-                    .foregroundColor(Constants.Colors.textSecondary)
-            } else {
-                Text("All settled up! 🎉")
-                    .font(.subheadline)
-                    .foregroundColor(Constants.Colors.success)
+                // All settled up state
+                HomiEmptyState(
+                    icon: "checkmark.circle.fill",
+                    title: "All Settled Up!",
+                    message: "No outstanding balances with your housemates"
+                )
+                .padding(.vertical, Constants.Spacing.xxLarge)
             }
 
-            Divider()
-                .padding(.vertical, Constants.Spacing.xxSmall)
+            // Payment History Button
+            if let onViewHistory = onViewHistory {
+                Button(action: onViewHistory) {
+                    HStack {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.system(size: 16))
 
-            // Breakdown
-            HStack(spacing: Constants.Spacing.large) {
-                VStack(spacing: 4) {
-                    Text(formattedAmount(totalOwedToYou))
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                        .foregroundColor(Constants.Colors.success)
-
-                    Text("Owed to you")
-                        .font(.caption)
-                        .foregroundColor(Constants.Colors.textSecondary)
-                }
-
-                Divider()
-                    .frame(height: 40)
-
-                VStack(spacing: 4) {
-                    Text(formattedAmount(totalYouOwe))
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                        .foregroundColor(Constants.Colors.danger)
-
-                    Text("You owe")
-                        .font(.caption)
-                        .foregroundColor(Constants.Colors.textSecondary)
-                }
-            }
-        }
-        .padding(Constants.Spacing.medium)
-        .background(
-            LinearGradient(
-                colors: [Constants.Colors.primary.opacity(0.05), Constants.Colors.primary.opacity(0.02)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
-        .cornerRadius(Constants.CornerRadius.medium)
-    }
-
-    private func balanceRow(balance: Balance) -> some View {
-        HStack(spacing: Constants.Spacing.medium) {
-            // Avatar placeholder
-            Circle()
-                .fill(Constants.Colors.primary.opacity(0.2))
-                .frame(width: 44, height: 44)
-                .overlay {
-                    Text(balance.userName.prefix(1).uppercased())
-                        .font(.headline)
-                        .foregroundColor(Constants.Colors.primary)
-                }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(balance.userName)
-                    .font(.headline)
-                    .foregroundColor(Constants.Colors.textPrimary)
-
-                if balance.netBalance > 0 {
-                    Text("owes you")
-                        .font(.caption)
-                        .foregroundColor(Constants.Colors.textSecondary)
-                } else {
-                    Text("you owe")
-                        .font(.caption)
-                        .foregroundColor(Constants.Colors.textSecondary)
-                }
-            }
-
-            Spacer()
-
-            VStack(alignment: .trailing, spacing: 4) {
-                Text(balance.formattedBalance)
-                    .font(.title3)
-                    .fontWeight(.bold)
-                    .foregroundColor(balance.netBalance > 0 ? Constants.Colors.success : Constants.Colors.danger)
-
-                if balance.netBalance < 0 {
-                    Button {
-                        onSettle?(balance)
-                    } label: {
-                        Text("Settle Up")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, Constants.Spacing.small)
-                            .padding(.vertical, Constants.Spacing.xxSmall)
-                            .background(Constants.Colors.primary)
-                            .cornerRadius(Constants.CornerRadius.small)
+                        Text("View Payment History")
+                            .font(Constants.Typography.bodyMedium)
                     }
+                    .foregroundColor(Constants.Colors.primary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, Constants.Spacing.medium)
                 }
             }
         }
-        .padding(Constants.Spacing.medium)
-        .background(Color(.systemBackground))
-        .cornerRadius(Constants.CornerRadius.medium)
-        .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
     }
+}
 
-    private var emptyStateView: some View {
-        VStack(spacing: Constants.Spacing.medium) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 50))
-                .foregroundColor(Constants.Colors.success)
+// MARK: - Balance Person Card (Clean, Minimal)
 
-            Text("All Settled Up!")
-                .font(.title3)
-                .fontWeight(.semibold)
-                .foregroundColor(Constants.Colors.textPrimary)
+struct BalancePersonCard: View {
+    let balance: Balance
+    var currency: String = "USD"
+    var onSettle: (() -> Void)?
 
-            Text("No outstanding balances with your housemates")
-                .font(.body)
-                .foregroundColor(Constants.Colors.textSecondary)
-                .multilineTextAlignment(.center)
+    private var balanceText: String {
+        if balance.netBalance > 0 {
+            return "\(balance.userName) owes you \(formattedAmount(balance.netBalance))"
+        } else {
+            return "You owe \(balance.userName) \(formattedAmount(abs(balance.netBalance)))"
         }
-        .padding(Constants.Spacing.xLarge)
     }
 
     private var balanceColor: Color {
-        if netBalance > 0 {
-            return Constants.Colors.success
-        } else if netBalance < 0 {
-            return Constants.Colors.danger
-        } else {
-            return Constants.Colors.textPrimary
+        balance.netBalance > 0 ? Constants.Colors.success : Constants.Colors.danger
+    }
+
+    var body: some View {
+        HomiCard(shadowStyle: .subtle) {
+            HStack(spacing: Constants.Spacing.medium) {
+                // Avatar
+                Circle()
+                    .fill(Constants.Colors.tertiaryBackground)
+                    .frame(width: 44, height: 44)
+                    .overlay(
+                        Text(balance.userName.prefix(1).uppercased())
+                            .font(Constants.Typography.headline)
+                            .foregroundColor(Constants.Colors.primary)
+                    )
+
+                // Name & Description
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(balance.userName)
+                        .font(Constants.Typography.headline)
+                        .foregroundColor(Constants.Colors.textPrimary)
+
+                    Text(balance.netBalance > 0 ? "Owes you" : "You owe")
+                        .font(Constants.Typography.caption1)
+                        .foregroundColor(Constants.Colors.textSecondary)
+                }
+
+                Spacer()
+
+                // Amount & Action
+                VStack(alignment: .trailing, spacing: 8) {
+                    Text(formattedAmount(abs(balance.netBalance)))
+                        .font(Constants.Typography.title3)
+                        .foregroundColor(balanceColor)
+
+                    // Settle Up button (only if user owes money)
+                    if balance.netBalance < 0, let onSettle = onSettle {
+                        Button(action: {
+                            HapticManager.selection()
+                            onSettle()
+                        }) {
+                            Text("Settle Up")
+                                .font(Constants.Typography.caption1)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(Constants.Colors.primary)
+                                .cornerRadius(Constants.CornerRadius.small)
+                        }
+                    }
+                }
+            }
+            .padding(Constants.Spacing.cardPadding)
         }
     }
 
     private func formattedAmount(_ amount: Double) -> String {
-        return CurrencyFormatter.format(amount: abs(amount), currencyCode: currency)
+        return CurrencyFormatter.format(amount: amount, currencyCode: currency)
     }
 }
 
 // MARK: - Preview
 
-struct BalanceSummaryView_Previews: PreviewProvider {
-    static var previews: some View {
-        ScrollView {
-            BalanceSummaryView(
-                balances: [
-                    Balance(userId: "1", userName: "John Doe", owedToYou: 50.00, youOwe: 0),
-                    Balance(userId: "2", userName: "Jane Smith", owedToYou: 0, youOwe: 30.50)
-                ],
-                totalYouOwe: 30.50,
-                totalOwedToYou: 50.00
-            )
-            .padding()
-        }
-        .background(Color(.systemGroupedBackground))
+#Preview {
+    ScrollView {
+        BalanceSummaryView(
+            balances: [
+                Balance(userId: "1", userName: "John Doe", owedToYou: 50.00, youOwe: 0),
+                Balance(userId: "2", userName: "Jane Smith", owedToYou: 0, youOwe: 30.50),
+                Balance(userId: "3", userName: "Mike Johnson", owedToYou: 25.00, youOwe: 0)
+            ],
+            totalYouOwe: 30.50,
+            totalOwedToYou: 75.00,
+            onViewHistory: {}
+        )
+        .padding()
     }
 }

@@ -36,19 +36,23 @@ struct MessagesView: View {
                     noHouseView
                 }
             }
-            .navigationTitle("Messages")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: {
-                        // Dismiss keyboard first
-                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                        // Navigate back to home tab
-                        selectedTab = 0
-                    }) {
-                        Image(systemName: "chevron.left")
-                            .font(.title3)
-                            .foregroundColor(Constants.Colors.primary)
+                    HStack(spacing: Constants.Spacing.small) {
+                        Button(action: {
+                            // Dismiss keyboard first
+                            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                            // Navigate back to home tab
+                            selectedTab = 0
+                        }) {
+                            Image(systemName: "chevron.left")
+                                .font(.title3)
+                                .foregroundColor(Constants.Colors.primary)
+                        }
+
+                        Text(messageTab == 0 ? "House Chat" : "Direct Messages")
+                            .font(Constants.Typography.title2)
                     }
                 }
             }
@@ -59,22 +63,11 @@ struct MessagesView: View {
     }
 
     private var noHouseView: some View {
-        VStack(spacing: Constants.Spacing.large) {
-            Image(systemName: "house.slash")
-                .font(.system(size: 60))
-                .foregroundColor(Constants.Colors.textSecondary)
-
-            Text("No House Found")
-                .font(.title2)
-                .fontWeight(.semibold)
-
-            Text("You need to be part of a house to use messaging")
-                .font(.body)
-                .foregroundColor(Constants.Colors.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, Constants.Spacing.xLarge)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        HomiEmptyState(
+            icon: "house.slash",
+            title: "No House Found",
+            message: "You need to be part of a house to use messaging"
+        )
     }
 
     private func loadHouseData() {

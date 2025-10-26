@@ -6,6 +6,8 @@ struct MessageBubbleView: View {
     let showAvatar: Bool
     var onDelete: (() -> Void)?
 
+    @State private var showTimestamp = false
+
     var body: some View {
         HStack(alignment: .bottom, spacing: Constants.Spacing.small) {
             if !isFromCurrentUser && showAvatar {
@@ -54,12 +56,21 @@ struct MessageBubbleView: View {
                     systemMessageView
                 } else {
                     regularMessageView
+                        .onTapGesture {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                showTimestamp.toggle()
+                            }
+                        }
                 }
 
-                Text(message.formattedTime)
-                    .font(.caption2)
-                    .foregroundColor(Constants.Colors.textSecondary)
-                    .padding(isFromCurrentUser ? .trailing : .leading, Constants.Spacing.small)
+                // Timestamp (only shown when tapped)
+                if showTimestamp && message.type != .system {
+                    Text(message.formattedTime)
+                        .font(.caption2)
+                        .foregroundColor(Constants.Colors.textSecondary)
+                        .padding(isFromCurrentUser ? .trailing : .leading, Constants.Spacing.small)
+                        .transition(.opacity)
+                }
             }
 
             if !isFromCurrentUser {

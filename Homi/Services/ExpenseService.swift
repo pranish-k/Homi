@@ -205,6 +205,19 @@ class ExpenseService: ObservableObject {
         try await batch.commit()
     }
 
+    /// Get payment history for a house
+    func getPaymentHistory(houseId: String) async throws -> [Payment] {
+        let snapshot = try await db.collection(Constants.Collections.houses)
+            .document(houseId)
+            .collection(Constants.Collections.payments)
+            .order(by: "timestamp", descending: true)
+            .getDocuments()
+
+        return snapshot.documents.compactMap { doc in
+            Payment.fromFirestore(doc.data())
+        }
+    }
+
     /// Start listening to payments
     func startListeningToPayments(houseId: String) {
         paymentsListener = db.collection(Constants.Collections.houses)

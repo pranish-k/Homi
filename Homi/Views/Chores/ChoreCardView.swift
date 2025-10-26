@@ -1,5 +1,7 @@
 import SwiftUI
 
+// MARK: - Redesigned Chore Card (Clean & Minimal)
+
 struct ChoreCardView: View {
     let chore: Chore
     let currentUserId: String
@@ -12,166 +14,87 @@ struct ChoreCardView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Constants.Spacing.small) {
-            // Header
-            HStack(alignment: .top) {
-                // Category icon
-                Image(systemName: chore.category.icon)
-                    .font(.title3)
-                    .foregroundColor(chore.category.color)
-                    .frame(width: 36, height: 36)
-                    .background(chore.category.color.opacity(0.1))
-                    .cornerRadius(Constants.CornerRadius.small)
+        HomiCard(shadowStyle: .subtle) {
+            HStack(spacing: Constants.Spacing.medium) {
+                // Category Icon
+                ZStack {
+                    Circle()
+                        .fill(chore.category.color.opacity(0.15))
+                        .frame(width: 44, height: 44)
 
+                    Image(systemName: chore.category.icon)
+                        .font(.system(size: 20))
+                        .foregroundColor(chore.category.color)
+                }
+
+                // Title & Assignee
                 VStack(alignment: .leading, spacing: 4) {
                     Text(chore.title)
-                        .font(.headline)
+                        .font(Constants.Typography.headline)
                         .foregroundColor(Constants.Colors.textPrimary)
+                        .lineLimit(1)
 
-                    Text(chore.category.rawValue)
-                        .font(.caption)
-                        .foregroundColor(Constants.Colors.textSecondary)
+                    Text(isAssignedToCurrentUser ? "You" : chore.assignedToName)
+                        .font(Constants.Typography.caption1)
+                        .foregroundColor(isAssignedToCurrentUser ? Constants.Colors.primary : Constants.Colors.textSecondary)
                 }
 
                 Spacer()
 
-                // Completion button (visible for assigned user)
-                if isAssignedToCurrentUser {
-                    Button(action: {
-                        if chore.isCompleted {
-                            onUncomplete?()
-                        } else {
-                            onComplete?()
-                        }
-                    }) {
-                        Image(systemName: chore.isCompleted ? "checkmark.circle.fill" : "circle")
-                            .font(.title2)
-                            .foregroundColor(chore.isCompleted ? Constants.Colors.success : Constants.Colors.textSecondary)
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                // Points badge
-                if chore.points > 0 {
-                    HStack(spacing: 4) {
-                        Image(systemName: "star.fill")
-                            .font(.caption)
-                            .foregroundColor(.yellow)
-
-                        Text("\(chore.points)")
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(Constants.Colors.textPrimary)
-                    }
-                    .padding(.horizontal, Constants.Spacing.small)
-                    .padding(.vertical, Constants.Spacing.xxSmall)
-                    .background(Color.yellow.opacity(0.1))
-                    .cornerRadius(Constants.CornerRadius.small)
-                }
-            }
-
-            // Description
-            if let description = chore.description {
-                Text(description)
-                    .font(.subheadline)
-                    .foregroundColor(Constants.Colors.textSecondary)
-                    .lineLimit(2)
-            }
-
-            Divider()
-                .padding(.vertical, Constants.Spacing.xxSmall)
-
-            // Info row
-            HStack {
-                // Assignee
-                HStack(spacing: 4) {
-                    Image(systemName: "person.fill")
-                        .font(.caption)
-                        .foregroundColor(Constants.Colors.textSecondary)
-
-                    if isAssignedToCurrentUser {
-                        Text("You")
-                            .font(.subheadline)
-                            .foregroundColor(Constants.Colors.primary)
-                            .fontWeight(.medium)
+                // Status & Actions
+                VStack(alignment: .trailing, spacing: 8) {
+                    // Due date badge
+                    if !chore.isCompleted {
+                        HomiBadge(
+                            chore.dueDateDescription,
+                            icon: dueDateIcon,
+                            style: dueDateBadgeStyle,
+                            size: .small
+                        )
                     } else {
-                        Text(chore.assignedToName)
-                            .font(.subheadline)
-                            .foregroundColor(Constants.Colors.textSecondary)
+                        HomiBadge(
+                            "Done",
+                            icon: "checkmark",
+                            style: .success,
+                            size: .small
+                        )
                     }
 
-                    // Rotation indicator
-                    if chore.rotationEnabled {
-                        Image(systemName: "arrow.triangle.2.circlepath")
-                            .font(.caption)
-                            .foregroundColor(Constants.Colors.textSecondary)
+                    // Nudge button (if overdue and not assigned to current user and not completed)
+                    if chore.isOverdue && !isAssignedToCurrentUser && !chore.isCompleted {
+                        NudgeButton(
+                            targetUserId: chore.assignedTo,
+                            targetUserName: chore.assignedToName,
+                            itemId: chore.id,
+                            itemTitle: chore.title,
+                            nudgeType: .choreOverdue
+                        )
                     }
-                }
 
-                Spacer()
-
-                // Due date
-                HStack(spacing: 4) {
-                    Image(systemName: dueDateIcon)
-                        .font(.caption)
-                        .foregroundColor(dueDateColor)
-
-                    Text(chore.dueDateDescription)
-                        .font(.subheadline)
-                        .foregroundColor(dueDateColor)
-                }
-            }
-
-            // Frequency
-            if chore.frequency != .once {
-                HStack(spacing: 4) {
-                    Image(systemName: "repeat")
-                        .font(.caption)
-                        .foregroundColor(Constants.Colors.textSecondary)
-
-                    Text(chore.frequency.rawValue)
-                        .font(.caption)
-                        .foregroundColor(Constants.Colors.textSecondary)
-                }
-            }
-
-            // Completed status
-            if chore.isCompleted {
-                HStack {
-                    Spacer()
-                    Label {
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text("Completed")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-
-                            if let completedByName = chore.completedByName {
-                                Text("by \(completedByName)")
-                                    .font(.caption2)
+                    // Complete checkbox (if assigned to current user)
+                    if isAssignedToCurrentUser {
+                        Button(action: {
+                            HapticManager.impact(style: .light)
+                            if chore.isCompleted {
+                                onUncomplete?()
+                            } else {
+                                onComplete?()
                             }
+                        }) {
+                            Image(systemName: chore.isCompleted ? "checkmark.circle.fill" : "circle")
+                                .font(.system(size: 24))
+                                .foregroundColor(chore.isCompleted ? Constants.Colors.success : Constants.Colors.textSecondary)
                         }
-                    } icon: {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.caption)
                     }
-                    .foregroundColor(Constants.Colors.success)
-                    .padding(.horizontal, Constants.Spacing.small)
-                    .padding(.vertical, Constants.Spacing.xxSmall)
-                    .background(Constants.Colors.success.opacity(0.1))
-                    .cornerRadius(Constants.CornerRadius.small)
                 }
             }
+            .padding(Constants.Spacing.cardPadding)
         }
-        .padding(Constants.Spacing.medium)
-        .background(Color(.systemBackground))
-        .cornerRadius(Constants.CornerRadius.medium)
-        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
         .overlay(
-            RoundedRectangle(cornerRadius: Constants.CornerRadius.medium)
-                .stroke(chore.isOverdue ? Constants.Colors.danger.opacity(0.3) : Color.clear, lineWidth: 2)
+            RoundedRectangle(cornerRadius: Constants.CornerRadius.card)
+                .stroke(chore.isOverdue && !chore.isCompleted ? Constants.Colors.danger.opacity(0.3) : Color.clear, lineWidth: 1.5)
         )
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-            // Only show swipe actions for assigned user
             if isAssignedToCurrentUser {
                 if chore.isCompleted {
                     Button {
@@ -179,7 +102,7 @@ struct ChoreCardView: View {
                     } label: {
                         Label("Undo", systemImage: "arrow.uturn.backward")
                     }
-                    .tint(.orange)
+                    .tint(Constants.Colors.warning)
                 } else {
                     Button {
                         onComplete?()
@@ -191,32 +114,6 @@ struct ChoreCardView: View {
             }
         }
         .swipeActions(edge: .leading, allowsFullSwipe: false) {
-            // Delete action on leading edge (only for creator)
-            if chore.createdBy == currentUserId {
-                Button(role: .destructive) {
-                    onDelete?()
-                } label: {
-                    Label("Delete", systemImage: "trash")
-                }
-            }
-        }
-        .contextMenu {
-            if !chore.isCompleted && isAssignedToCurrentUser {
-                Button {
-                    onComplete?()
-                } label: {
-                    Label("Mark as Complete", systemImage: "checkmark.circle")
-                }
-            }
-
-            if chore.isCompleted && isAssignedToCurrentUser {
-                Button {
-                    onUncomplete?()
-                } label: {
-                    Label("Mark as Incomplete", systemImage: "arrow.uturn.backward.circle")
-                }
-            }
-
             if chore.createdBy == currentUserId {
                 Button(role: .destructive) {
                     onDelete?()
@@ -237,38 +134,35 @@ struct ChoreCardView: View {
         }
     }
 
-    private var dueDateColor: Color {
+    private var dueDateBadgeStyle: HomiBadgeStyle {
         if chore.isOverdue {
-            return Constants.Colors.danger
+            return .danger
         } else if chore.isDueToday {
-            return Constants.Colors.warning
+            return .warning
         } else {
-            return Constants.Colors.textSecondary
+            return .neutral
         }
     }
 }
 
 // MARK: - Preview
 
-struct ChoreCardView_Previews: PreviewProvider {
-    static var previews: some View {
-        VStack(spacing: Constants.Spacing.medium) {
-            ChoreCardView(
-                chore: Chore.sampleChores[0],
-                currentUserId: "user1"
-            )
+#Preview {
+    VStack(spacing: Constants.Spacing.medium) {
+        ChoreCardView(
+            chore: Chore.sampleChores[0],
+            currentUserId: "user1"
+        )
 
-            ChoreCardView(
-                chore: Chore.sampleChores[1],
-                currentUserId: "user2"
-            )
+        ChoreCardView(
+            chore: Chore.sampleChores[1],
+            currentUserId: "user2"
+        )
 
-            ChoreCardView(
-                chore: Chore.sampleChores[2],
-                currentUserId: "user3"
-            )
-        }
-        .padding()
-        .background(Color(.systemGroupedBackground))
+        ChoreCardView(
+            chore: Chore.sampleChores[2],
+            currentUserId: "user3"
+        )
     }
+    .padding()
 }

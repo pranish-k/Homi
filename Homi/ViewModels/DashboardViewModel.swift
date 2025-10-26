@@ -181,6 +181,45 @@ class DashboardViewModel: ObservableObject {
         }
     }
 
+    // What's Next - Most urgent item to show user
+    var whatsNextItem: WhatsNextItemType {
+        // Priority 1: Overdue chore
+        if let overdueChore = choreService.chores
+            .filter({ !$0.isCompleted && $0.dueDate < Date() })
+            .sorted(by: { $0.dueDate < $1.dueDate })
+            .first {
+            return .overdueChore(overdueChore)
+        }
+
+        // Priority 2: Payment owed by user
+        guard let userId = authService.user?.uid else {
+            return .allCaughtUp
+        }
+
+        if myBalance < 0 {
+            // Find who user owes the most
+            let balances = expenseService.calculateBalances(currentUserId: userId, houseMembers: houseMembers)
+            if let maxDebt = balances.filter({ $0.netBalance < 0 }).max(by: { abs($0.netBalance) < abs($1.netBalance) }) {
+                return .overduePayment(amount: abs(maxDebt.netBalance), person: maxDebt.userName)
+            }
+        }
+
+        // Priority 3: Chore due today
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: today)!
+
+        if let dueTodayChore = choreService.chores
+            .filter({ !$0.isCompleted && $0.dueDate >= today && $0.dueDate < tomorrow })
+            .sorted(by: { $0.dueDate < $1.dueDate })
+            .first {
+            return .dueToday(dueTodayChore)
+        }
+
+        // No urgent items
+        return .allCaughtUp
+    }
+
     // MARK: - Actions
 
     func shareInvite() {

@@ -59,23 +59,11 @@ struct GroupChatView: View {
     }
 
     private var emptyStateView: some View {
-        VStack(spacing: Constants.Spacing.medium) {
-            Image(systemName: "bubble.left.and.bubble.right")
-                .font(.system(size: 60))
-                .foregroundColor(Constants.Colors.textSecondary)
-
-            Text("No messages yet")
-                .font(.title3)
-                .fontWeight(.semibold)
-                .foregroundColor(Constants.Colors.textPrimary)
-
-            Text("Start the conversation with your housemates!")
-                .font(.body)
-                .foregroundColor(Constants.Colors.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, Constants.Spacing.xLarge)
-        }
-        .frame(maxWidth: .infinity)
+        HomiEmptyState(
+            icon: "bubble.left.and.bubble.right",
+            title: "No messages yet",
+            message: "Start the conversation with your housemates!"
+        )
         .padding(.top, 100)
     }
 
@@ -83,6 +71,7 @@ struct GroupChatView: View {
         ForEach(Array(viewModel.messages.enumerated()), id: \.element.id) { index, message in
             let isFromCurrentUser = message.isFromCurrentUser(userId: viewModel.currentUserId ?? "")
             let showAvatar = shouldShowAvatar(for: message, at: index)
+            let isLastMessage = (index == viewModel.messages.count - 1)
 
             MessageBubbleView(
                 message: message,
@@ -96,6 +85,16 @@ struct GroupChatView: View {
             )
             .padding(.horizontal, Constants.Spacing.medium)
             .id(message.id)
+
+            // Show timestamp for last message in the conversation
+            if isLastMessage {
+                Text(message.formattedTime)
+                    .font(.caption2)
+                    .foregroundColor(Constants.Colors.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.top, 2)
+                    .padding(.horizontal, Constants.Spacing.medium)
+            }
         }
     }
 

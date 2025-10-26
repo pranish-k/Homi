@@ -66,12 +66,15 @@ struct DirectChatView: View {
                     ForEach(viewModel.groupMessagesByDate(), id: \.0) { date, messages in
                         // Date header
                         Text(date)
-                            .font(Constants.Typography.caption)
+                            .font(Constants.Typography.caption1)
                             .foregroundColor(Constants.Colors.textSecondary)
                             .padding(.vertical, Constants.Spacing.xSmall)
 
                         // Messages for this date
-                        ForEach(messages) { message in
+                        ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
+                            let showAvatar = shouldShowAvatar(for: message, at: index, in: messages)
+                            let isLastMessage = (index == messages.count - 1)
+
                             DirectMessageBubble(
                                 message: message,
                                 currentUserId: viewModel.currentUserId ?? "",
@@ -80,9 +83,19 @@ struct DirectChatView: View {
                                         await viewModel.deleteMessage(message)
                                     }
                                 },
-                                canDelete: viewModel.canDeleteMessage(message)
+                                canDelete: viewModel.canDeleteMessage(message),
+                                showAvatar: showAvatar
                             )
                             .id(message.id)
+
+                            // Show timestamp for last message in the conversation
+                            if isLastMessage && messages.count > 0 {
+                                Text(message.formattedTime)
+                                    .font(.caption2)
+                                    .foregroundColor(Constants.Colors.textSecondary)
+                                    .frame(maxWidth: .infinity, alignment: .center)
+                                    .padding(.top, 2)
+                            }
                         }
                     }
                 }
@@ -101,6 +114,17 @@ struct DirectChatView: View {
                 }
             }
         }
+    }
+
+    // Helper to determine if avatar should be shown
+    private func shouldShowAvatar(for message: DirectMessage, at index: Int, in messages: [DirectMessage]) -> Bool {
+        // Show avatar if it's the first message or if the previous message is from a different sender
+        if index == 0 {
+            return true
+        }
+
+        let previousMessage = messages[index - 1]
+        return previousMessage.senderId != message.senderId
     }
 
     private var emptyStateView: some View {
@@ -133,15 +157,18 @@ struct DirectMessageBubble: View {
     let currentUserId: String
     let onDelete: () -> Void
     let canDelete: Bool
+    let showAvatar: Bool
+
+    @State private var showTimestamp = false
 
     private var isFromCurrentUser: Bool {
         message.isFromCurrentUser(currentUserId: currentUserId)
     }
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: Constants.Spacing.xSmall) {
-            if !isFromCurrentUser {
-                // Other user's avatar
+        HStack(alignment: .bottom, spacing: Constants.Spacing.small) {
+            // Left avatar for other user
+            if !isFromCurrentUser && showAvatar {
                 if let photoUrl = message.senderPhoto, !photoUrl.isEmpty, let url = URL(string: photoUrl) {
                     AsyncImage(url: url) { image in
                         image
@@ -150,28 +177,44 @@ struct DirectMessageBubble: View {
                     } placeholder: {
                         initialsBubble
                     }
-                    .frame(width: 30, height: 30)
+                    .frame(width: 32, height: 32)
                     .clipShape(Circle())
                 } else {
                     initialsBubble
                 }
-            } else {
-                Spacer()
+            } else if !isFromCurrentUser {
+                // Spacer to align non-avatar messages
+                Color.clear.frame(width: 32, height: 32)
             }
 
-            // Message bubble
-            VStack(alignment: isFromCurrentUser ? .trailing : .leading, spacing: 4) {
+            // Spacer for current user messages to push right
+            if isFromCurrentUser {
+                Spacer(minLength: 60)
+            }
+
+            // Message bubble with tap-to-reveal timestamp
+            VStack(alignment: isFromCurrentUser ? .trailing : .leading, spacing: Constants.Spacing.xxSmall) {
                 Text(message.content)
                     .font(Constants.Typography.body)
                     .foregroundColor(isFromCurrentUser ? .white : Constants.Colors.textPrimary)
-                    .padding(.horizontal, Constants.Spacing.small)
-                    .padding(.vertical, Constants.Spacing.xSmall)
+                    .padding(.horizontal, Constants.Spacing.medium)
+                    .padding(.vertical, Constants.Spacing.small)
                     .background(isFromCurrentUser ? Constants.Colors.primary : Color(.systemGray5))
-                    .cornerRadius(Constants.CornerRadius.medium)
+                    .cornerRadius(Constants.CornerRadius.medium, corners: isFromCurrentUser ? [.topLeft, .topRight, .bottomLeft] : [.topLeft, .topRight, .bottomRight])
+                    .onTapGesture {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showTimestamp.toggle()
+                        }
+                    }
 
-                Text(message.formattedTime)
-                    .font(Constants.Typography.caption)
-                    .foregroundColor(Constants.Colors.textSecondary)
+                // Timestamp (only shown when tapped)
+                if showTimestamp {
+                    Text(message.formattedTime)
+                        .font(.caption2)
+                        .foregroundColor(Constants.Colors.textSecondary)
+                        .padding(isFromCurrentUser ? .trailing : .leading, Constants.Spacing.small)
+                        .transition(.opacity)
+                }
             }
             .contextMenu {
                 if canDelete {
@@ -183,8 +226,9 @@ struct DirectMessageBubble: View {
                 }
             }
 
-            if isFromCurrentUser {
-                Spacer()
+            // Spacer for other user messages to push left
+            if !isFromCurrentUser {
+                Spacer(minLength: 60)
             }
         }
     }
@@ -192,7 +236,7 @@ struct DirectMessageBubble: View {
     private var initialsBubble: some View {
         Circle()
             .fill(Constants.Colors.primary.opacity(0.2))
-            .frame(width: 30, height: 30)
+            .frame(width: 32, height: 32)
             .overlay {
                 Text(String(message.senderName.prefix(1)).uppercased())
                     .font(.system(size: 14, weight: .semibold))

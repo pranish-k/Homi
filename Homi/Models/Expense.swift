@@ -119,6 +119,27 @@ struct Expense: Identifiable, Codable, Equatable {
         formatter.dateFormat = "MMM d"
         return formatter.string(from: date)
     }
+
+    var relativeDate: String {
+        let calendar = Calendar.current
+        let now = Date()
+
+        if calendar.isDateInToday(date) {
+            return "Today"
+        } else if calendar.isDateInYesterday(date) {
+            return "Yesterday"
+        } else if let daysAgo = calendar.dateComponents([.day], from: date, to: now).day {
+            if daysAgo < 7 {
+                return "\(daysAgo) days ago"
+            } else if daysAgo < 30 {
+                let weeksAgo = daysAgo / 7
+                return "\(weeksAgo) \(weeksAgo == 1 ? "week" : "weeks") ago"
+            }
+        }
+
+        // Fall back to short date for older expenses
+        return shortDate
+    }
 }
 
 // MARK: - Expense Split

@@ -171,7 +171,7 @@ struct ConversationRow: View {
                     Spacer()
 
                     Text(conversation.formattedLastMessageTime)
-                        .font(Constants.Typography.caption)
+                        .font(Constants.Typography.caption1)
                         .foregroundColor(hasUnread ? Constants.Colors.primary : Constants.Colors.textSecondary)
                 }
 

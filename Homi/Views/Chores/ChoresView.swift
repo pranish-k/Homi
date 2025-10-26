@@ -56,8 +56,13 @@ struct ChoresView: View {
                     noHouseView
                 }
             }
-            .navigationTitle("Chores")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Text("Chores")
+                        .font(Constants.Typography.title2)
+                }
+
                 if authService.userProfile?.currentHouseId != nil {
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button {
