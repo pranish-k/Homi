@@ -1,29 +1,68 @@
 import SwiftUI
 
 struct Constants {
-    // MARK: - Colors
+    // MARK: - Colors (Theme-aware)
     struct Colors {
-        static let primary = Color(hex: "007AFF")
+        // Dynamic colors that change based on selected theme
+        static var primary: Color {
+            ThemeManager.shared.currentTheme.primaryColor
+        }
+
+        static var primaryLight: Color {
+            ThemeManager.shared.currentTheme.primaryColor.opacity(0.1)
+        }
+
+        static var primaryDark: Color {
+            ThemeManager.shared.currentTheme.primaryDarkColor
+        }
+
+        // Semantic colors (consistent across themes)
         static let success = Color(hex: "34C759")
         static let warning = Color(hex: "FF9500")
         static let danger = Color(hex: "FF3B30")
-        static let background = Color(hex: "F2F2F7")
+
+        // Background colors
+        static let background = Color(uiColor: .systemBackground)
+        static let secondaryBackground = Color(uiColor: .secondarySystemBackground)
+        static let tertiaryBackground = Color(uiColor: .tertiarySystemBackground)
+        static let groupedBackground = Color(uiColor: .systemGroupedBackground)
+
+        // Text colors
         static let textPrimary = Color.primary
         static let textSecondary = Color(hex: "8E8E93")
+        static let textTertiary = Color(hex: "C7C7CC")
+
+        // Card colors
+        static let cardBackground = Color(uiColor: .secondarySystemBackground)
+        static let cardBorder = Color(hex: "E5E5EA")
     }
 
-    // MARK: - Typography
+    // MARK: - Typography (Semantic Styles)
     struct Typography {
-        static let largeTitle = Font.largeTitle.weight(.bold)
-        static let title = Font.title.weight(.semibold)
-        static let title2 = Font.title2.weight(.semibold)
-        static let title3 = Font.title3.weight(.medium)
-        static let headline = Font.headline
-        static let body = Font.body
-        static let callout = Font.callout
-        static let subheadline = Font.subheadline
-        static let footnote = Font.footnote
-        static let caption = Font.caption
+        // Display styles
+        static let display = Font.system(size: 34, weight: .bold)
+        static let displayLarge = Font.system(size: 48, weight: .bold)
+
+        // Title styles
+        static let title1 = Font.system(size: 28, weight: .bold)
+        static let title2 = Font.system(size: 22, weight: .semibold)
+        static let title3 = Font.system(size: 20, weight: .semibold)
+
+        // Headline styles
+        static let headline = Font.system(size: 17, weight: .semibold)
+        static let headlineMedium = Font.system(size: 17, weight: .medium)
+
+        // Body styles
+        static let body = Font.system(size: 17, weight: .regular)
+        static let bodyMedium = Font.system(size: 17, weight: .medium)
+        static let bodySemibold = Font.system(size: 17, weight: .semibold)
+
+        // Supporting styles
+        static let callout = Font.system(size: 16, weight: .regular)
+        static let subheadline = Font.system(size: 15, weight: .regular)
+        static let footnote = Font.system(size: 13, weight: .regular)
+        static let caption1 = Font.system(size: 12, weight: .regular)
+        static let caption2 = Font.system(size: 11, weight: .regular)
     }
 
     // MARK: - Spacing
@@ -35,23 +74,79 @@ struct Constants {
         static let large: CGFloat = 24
         static let xLarge: CGFloat = 32
         static let xxLarge: CGFloat = 48
+
+        // Padding presets
+        static let cardPadding: CGFloat = 16
+        static let screenPadding: CGFloat = 16
+        static let sectionSpacing: CGFloat = 24
     }
 
     // MARK: - Corner Radius
     struct CornerRadius {
+        static let xSmall: CGFloat = 6
         static let small: CGFloat = 8
         static let medium: CGFloat = 12
         static let large: CGFloat = 16
         static let xLarge: CGFloat = 24
         static let circular: CGFloat = 999
+
+        // Component-specific
+        static let button: CGFloat = 12
+        static let card: CGFloat = 16
+        static let badge: CGFloat = 8
+    }
+
+    // MARK: - Shadows
+    struct Shadow {
+        // Subtle shadow for cards
+        static let subtle = ShadowStyle(
+            color: Color.black.opacity(0.04),
+            radius: 8,
+            x: 0,
+            y: 2
+        )
+
+        // Medium shadow for elevated elements
+        static let medium = ShadowStyle(
+            color: Color.black.opacity(0.08),
+            radius: 12,
+            x: 0,
+            y: 4
+        )
+
+        // Elevated shadow for modals
+        static let elevated = ShadowStyle(
+            color: Color.black.opacity(0.12),
+            radius: 20,
+            x: 0,
+            y: 8
+        )
+    }
+
+    // Shadow style structure
+    struct ShadowStyle {
+        let color: Color
+        let radius: CGFloat
+        let x: CGFloat
+        let y: CGFloat
     }
 
     // MARK: - Animation
     struct Animation {
-        static let standard = SwiftUI.Animation.easeInOut(duration: 0.3)
         static let quick = SwiftUI.Animation.easeInOut(duration: 0.2)
+        static let standard = SwiftUI.Animation.easeInOut(duration: 0.3)
         static let slow = SwiftUI.Animation.easeInOut(duration: 0.5)
-        static let spring = SwiftUI.Animation.spring()
+        static let spring = SwiftUI.Animation.spring(response: 0.3, dampingFraction: 0.7)
+
+        // Button press animation
+        static let buttonPress = SwiftUI.Animation.easeInOut(duration: 0.15)
+    }
+
+    // MARK: - Button Styles
+    struct ButtonStyle {
+        static let height: CGFloat = 50
+        static let minTouchTarget: CGFloat = 44
+        static let iconSize: CGFloat = 20
     }
 
     // MARK: - Firebase Collections
@@ -65,6 +160,8 @@ struct Constants {
         static let payments = "payments"
         static let chores = "chores"
         static let balances = "balances"
+        static let conversations = "conversations"
+        static let directMessages = "directMessages"
     }
 
     // MARK: - User Defaults Keys

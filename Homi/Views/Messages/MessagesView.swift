@@ -28,8 +28,8 @@ struct MessagesView: View {
                         // House Group Chat
                         GroupChatView(houseId: houseId, houseName: house.name)
                     } else {
-                        // Direct Messages (Coming soon)
-                        directMessagesPlaceholder
+                        // Direct Messages
+                        DirectMessagesListView()
                     }
                 } else {
                     // No house - shouldn't happen but handle gracefully
@@ -56,30 +56,6 @@ struct MessagesView: View {
                 loadHouseData()
             }
         }
-    }
-
-    private var directMessagesPlaceholder: some View {
-        VStack(spacing: Constants.Spacing.large) {
-            Image(systemName: "person.2.fill")
-                .font(.system(size: 60))
-                .foregroundColor(Constants.Colors.primary)
-
-            Text("Direct Messages")
-                .font(.title2)
-                .fontWeight(.semibold)
-
-            Text("Coming Soon")
-                .font(.title3)
-                .foregroundColor(Constants.Colors.textSecondary)
-
-            Text("Private messaging between housemates will be available in a future update")
-                .font(.body)
-                .foregroundColor(Constants.Colors.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, Constants.Spacing.xLarge)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemBackground))
     }
 
     private var noHouseView: some View {
