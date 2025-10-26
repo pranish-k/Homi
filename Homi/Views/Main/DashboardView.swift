@@ -27,7 +27,7 @@ struct DashboardView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Text("Home")
-                        .font(Constants.Typography.title1)
+                        .font(Constants.Typography.title2)
                 }
 
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -272,10 +272,8 @@ struct QuickStatsGrid: View {
     @Binding var selectedTab: Int
 
     var body: some View {
-        LazyVGrid(
-            columns: [GridItem(.flexible()), GridItem(.flexible())],
-            spacing: Constants.Spacing.small
-        ) {
+        VStack(spacing: Constants.Spacing.small) {
+            // Balance card - full width
             QuickStatCard(
                 icon: "dollarsign.circle.fill",
                 title: "Balance",
@@ -284,29 +282,24 @@ struct QuickStatsGrid: View {
                 onTap: { selectedTab = 2 }
             )
 
-            QuickStatCard(
-                icon: "checklist",
-                title: "Due Today",
-                value: "\(viewModel.dueTodayChoresCount)",
-                color: viewModel.dueTodayChoresCount > 0 ? Constants.Colors.warning : Constants.Colors.textSecondary,
-                onTap: { selectedTab = 4 }
-            )
+            // Chores and Messages - side by side
+            HStack(spacing: Constants.Spacing.small) {
+                QuickStatCard(
+                    icon: "checklist",
+                    title: "Chores",
+                    value: "\(viewModel.dueTodayChoresCount)",
+                    color: viewModel.dueTodayChoresCount > 0 ? Constants.Colors.warning : Constants.Colors.textSecondary,
+                    onTap: { selectedTab = 4 }
+                )
 
-            QuickStatCard(
-                icon: "message.fill",
-                title: "Messages",
-                value: "\(viewModel.unreadMessagesCount)",
-                color: viewModel.unreadMessagesCount > 0 ? Constants.Colors.primary : Constants.Colors.textSecondary,
-                onTap: { selectedTab = 1 }
-            )
-
-            QuickStatCard(
-                icon: "location.fill",
-                title: "Sharing",
-                value: "\(viewModel.activeSharingMembers)",
-                color: viewModel.activeSharingMembers > 0 ? Constants.Colors.success : Constants.Colors.textSecondary,
-                onTap: { selectedTab = 3 }
-            )
+                QuickStatCard(
+                    icon: "message.fill",
+                    title: "Messages",
+                    value: "\(viewModel.unreadMessagesCount)",
+                    color: viewModel.unreadMessagesCount > 0 ? Constants.Colors.primary : Constants.Colors.textSecondary,
+                    onTap: { selectedTab = 1 }
+                )
+            }
         }
     }
 }
@@ -323,24 +316,31 @@ struct QuickStatCard: View {
     var body: some View {
         Button(action: onTap) {
             HomiCard(shadowStyle: .subtle) {
-                VStack(alignment: .leading, spacing: Constants.Spacing.small) {
+                VStack(alignment: .leading, spacing: Constants.Spacing.xSmall) {
+                    // Icon
                     Image(systemName: icon)
-                        .font(.system(size: 24))
+                        .font(.system(size: 28))
                         .foregroundColor(color)
+                        .frame(height: 32)
 
-                    Spacer()
+                    Spacer(minLength: 8)
 
+                    // Value - with proper scaling
                     Text(value)
-                        .font(Constants.Typography.title2)
+                        .font(.system(size: 32, weight: .bold, design: .rounded))
                         .foregroundColor(Constants.Colors.textPrimary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
 
+                    // Title
                     Text(title)
-                        .font(Constants.Typography.caption1)
+                        .font(Constants.Typography.subheadline)
                         .foregroundColor(Constants.Colors.textSecondary)
+                        .lineLimit(1)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(Constants.Spacing.cardPadding)
-                .frame(height: 110)
+                .padding(Constants.Spacing.medium)
+                .frame(minHeight: 120)
             }
         }
         .buttonStyle(PlainButtonStyle())
