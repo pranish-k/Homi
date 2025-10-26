@@ -46,9 +46,9 @@ struct LocationView: View {
                         .transition(.opacity.combined(with: .scale))
                     }
                 }
-                .frame(height: isCollapsed ? collapsedHeight : maxHeight)
+                .frame(maxWidth: .infinity, maxHeight: isCollapsed ? collapsedHeight : maxHeight)
                 .background(
-                    RoundedRectangle(cornerRadius: 20)
+                    RoundedRectangle(cornerRadius: isCollapsed ? 0 : 20)
                         .fill(Color(UIColor.systemBackground))
                         .shadow(color: .black.opacity(0.1), radius: 10, y: -5)
                 )

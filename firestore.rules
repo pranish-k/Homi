@@ -147,10 +147,19 @@ service cloud.firestore {
           request.resource.data.content.size() > 0 &&
           request.resource.data.content.size() <= 5000;
 
-        // Only sender can update their own message (within 15 minutes)
+        // Members can update messages for:
+        // 1. Sender can edit content within 15 minutes
+        // 2. Any member can update readBy array to mark as read
         allow update: if isMember(houseId) &&
-          resource.data.senderId == request.auth.uid &&
-          request.time < resource.data.timestamp + duration.value(15, 'm');
+          (
+            // Sender editing content within 15 minutes
+            (resource.data.senderId == request.auth.uid &&
+             request.time < resource.data.timestamp + duration.value(15, 'm')) ||
+            // Member marking message as read (only readBy field changes)
+            (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy']) &&
+             request.auth.uid in request.resource.data.readBy &&
+             !(request.auth.uid in resource.data.readBy))
+          );
 
         // Only sender can delete their own message
         allow delete: if isMember(houseId) && resource.data.senderId == request.auth.uid;
@@ -186,6 +195,68 @@ service cloud.firestore {
       // Only house creators can delete invite codes
       allow delete: if isAuthenticated() &&
         get(/databases/$(database)/documents/houses/$(resource.data.houseId)).data.createdBy == request.auth.uid;
+    }
+
+    // Conversations collection (for direct messaging)
+    match /conversations/{conversationId} {
+      // Users can read conversations they're part of
+      allow read: if isAuthenticated() &&
+        request.auth.uid in resource.data.participantIds;
+
+      // Users can create conversations they're part of
+      allow create: if isAuthenticated() &&
+        request.auth.uid in request.resource.data.participantIds &&
+        request.resource.data.participantIds.size() == 2;
+
+      // Participants can update conversation (last message, unread counts)
+      allow update: if isAuthenticated() &&
+        request.auth.uid in resource.data.participantIds;
+
+      // Participants can delete conversations
+      allow delete: if isAuthenticated() &&
+        request.auth.uid in resource.data.participantIds;
+    }
+
+    // Direct Messages collection
+    match /directMessages/{conversationId}/messages/{messageId} {
+      // Users can read messages in conversations they're part of
+      allow read: if isAuthenticated() &&
+        request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds;
+
+      // Users can send messages to conversations they're part of
+      allow create: if isAuthenticated() &&
+        request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds &&
+        request.resource.data.senderId == request.auth.uid &&
+        request.resource.data.content.size() > 0 &&
+        request.resource.data.content.size() <= 5000;
+
+      // Users can update read status on messages
+      allow update: if isAuthenticated() &&
+        request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds;
+
+      // Only sender can delete their own messages
+      allow delete: if isAuthenticated() &&
+        resource.data.senderId == request.auth.uid;
+    }
+
+    // Nudges collection
+    match /nudges/{nudgeId} {
+      // Users can read nudges sent to or from them
+      allow read: if isAuthenticated() &&
+        (resource.data.fromUserId == request.auth.uid ||
+         resource.data.toUserId == request.auth.uid);
+
+      // Users can send nudges (create)
+      allow create: if isAuthenticated() &&
+        request.resource.data.fromUserId == request.auth.uid &&
+        request.resource.data.houseId != null;
+
+      // No one can update nudges (immutable record)
+      allow update: if false;
+
+      // Users can delete nudges they sent
+      allow delete: if isAuthenticated() &&
+        resource.data.fromUserId == request.auth.uid;
     }
 
     // Deny all other access by default

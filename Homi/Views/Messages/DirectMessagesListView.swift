@@ -22,7 +22,6 @@ struct DirectMessagesListView: View {
                 conversationsList
             }
         }
-        .searchable(text: $viewModel.searchQuery, prompt: "Search conversations")
         .navigationDestination(item: $selectedConversation) { conversation in
             DirectChatView(conversation: conversation, viewModel: viewModel)
         }
