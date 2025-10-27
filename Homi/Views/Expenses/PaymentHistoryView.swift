@@ -5,8 +5,17 @@ import FirebaseAuth
 // MARK: - Payment History View
 
 struct PaymentHistoryView: View {
-    @StateObject private var viewModel = PaymentHistoryViewModel()
+    @StateObject private var viewModel: PaymentHistoryViewModel
     @Environment(\.dismiss) private var dismiss
+
+    let filterUserId: String?
+    let filterUserName: String?
+
+    init(filterUserId: String? = nil, filterUserName: String? = nil) {
+        self.filterUserId = filterUserId
+        self.filterUserName = filterUserName
+        _viewModel = StateObject(wrappedValue: PaymentHistoryViewModel(filterUserId: filterUserId))
+    }
 
     var body: some View {
         NavigationStack {
@@ -19,7 +28,7 @@ struct PaymentHistoryView: View {
                     paymentsList
                 }
             }
-            .navigationTitle("Payment History")
+            .navigationTitle(filterUserName != nil ? "Payments with \(filterUserName!)" : "Payment History")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -205,14 +214,34 @@ class PaymentHistoryViewModel: ObservableObject {
 
     private let expenseService = ExpenseService.shared
     private let authService = AuthService.shared
+    private let filterUserId: String?
+
+    init(filterUserId: String? = nil) {
+        self.filterUserId = filterUserId
+    }
 
     func loadPayments() async {
-        guard let houseId = authService.userProfile?.currentHouseId else { return }
+        guard let houseId = authService.userProfile?.currentHouseId,
+              let currentUserId = authService.user?.uid else { return }
 
         isLoading = true
 
         do {
-            payments = try await expenseService.getPaymentHistory(houseId: houseId)
+            let allPayments = try await expenseService.getPaymentHistory(houseId: houseId)
+
+            // Filter payments if userId is provided
+            if let filterUserId = filterUserId {
+                payments = allPayments.filter { payment in
+                    (payment.fromUserId == currentUserId && payment.toUserId == filterUserId) ||
+                    (payment.fromUserId == filterUserId && payment.toUserId == currentUserId)
+                }
+            } else {
+                // Show all payments involving current user
+                payments = allPayments.filter { payment in
+                    payment.fromUserId == currentUserId || payment.toUserId == currentUserId
+                }
+            }
+
             groupPaymentsByMonth()
         } catch {
             errorMessage = error.localizedDescription

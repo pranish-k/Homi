@@ -354,6 +354,63 @@ class FirestoreService: ObservableObject {
         self.logger.info("Member removed from house successfully")
     }
 
+    // MARK: - Payment Operations
+
+    func recordPayment(_ payment: Payment) async throws {
+        guard let houseId = payment.houseId as String? else {
+            throw FirestoreError.houseNotFound
+        }
+
+        let paymentData: [String: Any] = [
+            "houseId": payment.houseId,
+            "fromUserId": payment.fromUserId,
+            "fromUserName": payment.fromUserName,
+            "toUserId": payment.toUserId,
+            "toUserName": payment.toUserName,
+            "amount": payment.amount,
+            "timestamp": Timestamp(date: payment.timestamp),
+            "note": payment.note ?? ""
+        ]
+
+        try await db.collection(Constants.Collections.houses)
+            .document(houseId)
+            .collection("payments")
+            .addDocument(data: paymentData)
+
+        self.logger.info("Payment recorded successfully: \(payment.formattedAmount) from \(payment.fromUserName) to \(payment.toUserName)")
+    }
+
+    func getPayments(houseId: String, userId: String? = nil) async throws -> [Payment] {
+        let query: Query = db.collection(Constants.Collections.houses)
+            .document(houseId)
+            .collection("payments")
+            .order(by: "timestamp", descending: true)
+
+        let snapshot = try await query.getDocuments()
+
+        var payments = snapshot.documents.compactMap { doc -> Payment? in
+            try? doc.data(as: Payment.self)
+        }
+
+        // Filter by userId if provided (in-memory filtering)
+        if let filterUserId = userId {
+            payments = payments.filter { payment in
+                payment.fromUserId == filterUserId || payment.toUserId == filterUserId
+            }
+        }
+
+        return payments
+    }
+
+    func getPaymentsBetweenUsers(houseId: String, user1: String, user2: String) async throws -> [Payment] {
+        let allPayments = try await getPayments(houseId: houseId)
+
+        return allPayments.filter { payment in
+            (payment.fromUserId == user1 && payment.toUserId == user2) ||
+            (payment.fromUserId == user2 && payment.toUserId == user1)
+        }
+    }
+
     // MARK: - Helper Methods
 
     private func generateInviteCode() async throws -> String {

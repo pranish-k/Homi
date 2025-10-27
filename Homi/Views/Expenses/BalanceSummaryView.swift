@@ -11,6 +11,7 @@ struct BalanceSummaryView: View {
     var onNudge: ((Balance) -> Void)?
     var onClearPayment: ((Balance) -> Void)?
     var onViewHistory: (() -> Void)?
+    var onViewPersonHistory: ((Balance) -> Void)?
     var nudgeStates: [String: (canNudge: Bool, lastNudgeTime: Date?)] = [:]
 
     private var netBalance: Double {
@@ -30,6 +31,7 @@ struct BalanceSummaryView: View {
                             onSettle: { onSettle?(balance) },
                             onNudge: balance.netBalance > 0 ? { onNudge?(balance) } : nil,
                             onClearPayment: balance.netBalance > 0 ? { onClearPayment?(balance) } : nil,
+                            onViewPersonHistory: { onViewPersonHistory?(balance) },
                             lastNudgeTime: nudgeState?.lastNudgeTime,
                             canNudge: nudgeState?.canNudge ?? true
                         )
@@ -72,6 +74,7 @@ struct BalancePersonCard: View {
     var onSettle: (() -> Void)?
     var onNudge: (() -> Void)?
     var onClearPayment: (() -> Void)?
+    var onViewPersonHistory: (() -> Void)?
     var lastNudgeTime: Date?
     var canNudge: Bool = true
 
@@ -136,76 +139,96 @@ struct BalancePersonCard: View {
                         .foregroundColor(balanceColor)
                 }
 
-                // Action buttons for money owed to you
-                if balance.netBalance > 0 {
-                    HStack(spacing: Constants.Spacing.small) {
-                        // Clear Payment button
-                        if let onClearPayment = onClearPayment {
-                            Button(action: {
-                                HapticManager.selection()
-                                onClearPayment()
-                            }) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "checkmark.circle")
-                                        .font(.system(size: 14))
-                                    Text("Clear")
-                                        .font(Constants.Typography.caption1)
-                                        .fontWeight(.medium)
+                // Action buttons for money owed to you or owed by you
+                VStack(spacing: Constants.Spacing.small) {
+                    // Top row: Clear Balance and Nudge (only when they owe you)
+                    if balance.netBalance > 0 {
+                        HStack(spacing: Constants.Spacing.small) {
+                            // Clear Balance button
+                            if let onClearPayment = onClearPayment {
+                                Button(action: {
+                                    HapticManager.selection()
+                                    onClearPayment()
+                                }) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "checkmark.circle")
+                                            .font(.system(size: 14))
+                                        Text("Clear Balance")
+                                            .font(Constants.Typography.caption1)
+                                            .fontWeight(.medium)
+                                    }
+                                    .foregroundColor(Constants.Colors.success)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(Constants.Colors.success.opacity(0.1))
+                                    .cornerRadius(Constants.CornerRadius.small)
                                 }
-                                .foregroundColor(Constants.Colors.success)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(Constants.Colors.success.opacity(0.1))
-                                .cornerRadius(Constants.CornerRadius.small)
                             }
-                        }
 
-                        Spacer()
+                            Spacer()
 
-                        // Nudge status and button
-                        if let nudgeTime = nudgeTimeText {
-                            Text(nudgeTime)
-                                .font(.system(size: 11))
-                                .foregroundColor(Constants.Colors.textSecondary)
-                        }
+                            // Nudge status and button
+                            if let nudgeTime = nudgeTimeText {
+                                Text(nudgeTime)
+                                    .font(.system(size: 11))
+                                    .foregroundColor(Constants.Colors.textSecondary)
+                            }
 
-                        if let onNudge = onNudge {
-                            Button(action: {
-                                HapticManager.selection()
-                                onNudge()
-                            }) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: canNudge ? "bell" : "bell.slash")
-                                        .font(.system(size: 14))
-                                    Text("Nudge")
-                                        .font(Constants.Typography.caption1)
-                                        .fontWeight(.medium)
+                            if let onNudge = onNudge {
+                                Button(action: {
+                                    HapticManager.selection()
+                                    onNudge()
+                                }) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: canNudge ? "bell" : "bell.slash")
+                                            .font(.system(size: 14))
+                                        Text("Nudge")
+                                            .font(Constants.Typography.caption1)
+                                            .fontWeight(.medium)
+                                    }
+                                    .foregroundColor(canNudge ? Constants.Colors.primary : Constants.Colors.textSecondary)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background((canNudge ? Constants.Colors.primary : Constants.Colors.textSecondary).opacity(0.1))
+                                    .cornerRadius(Constants.CornerRadius.small)
                                 }
-                                .foregroundColor(canNudge ? Constants.Colors.primary : Constants.Colors.textSecondary)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background((canNudge ? Constants.Colors.primary : Constants.Colors.textSecondary).opacity(0.1))
-                                .cornerRadius(Constants.CornerRadius.small)
+                                .disabled(!canNudge)
                             }
-                            .disabled(!canNudge)
                         }
                     }
-                }
 
-                // Settle Up button (only if user owes money)
-                if balance.netBalance < 0, let onSettle = onSettle {
-                    Button(action: {
-                        HapticManager.selection()
-                        onSettle()
-                    }) {
-                        Text("Settle Up")
-                            .font(Constants.Typography.bodyMedium)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.white)
+                    // Settle Up button (only if user owes money)
+                    if balance.netBalance < 0, let onSettle = onSettle {
+                        Button(action: {
+                            HapticManager.selection()
+                            onSettle()
+                        }) {
+                            Text("Clear Balance")
+                                .font(Constants.Typography.bodyMedium)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .background(Constants.Colors.primary)
+                                .cornerRadius(Constants.CornerRadius.medium)
+                        }
+                    }
+
+                    // View payment history button (for this person)
+                    if let onViewPersonHistory = onViewPersonHistory {
+                        Button(action: {
+                            HapticManager.selection()
+                            onViewPersonHistory()
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "clock.arrow.circlepath")
+                                    .font(.system(size: 12))
+                                Text("View Payments")
+                                    .font(Constants.Typography.caption1)
+                            }
+                            .foregroundColor(Constants.Colors.textSecondary)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .background(Constants.Colors.primary)
-                            .cornerRadius(Constants.CornerRadius.medium)
+                        }
                     }
                 }
             }

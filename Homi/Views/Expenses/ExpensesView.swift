@@ -14,8 +14,10 @@ struct ExpensesView: View {
     @State private var houseMembers: [HouseMember] = []
     @State private var selectedBalance: Balance?
     @State private var selectedExpense: Expense?
-    @State private var showingSettlePayment = false
+    @State private var showingSettleUp = false
     @State private var showingPaymentHistory = false
+    @State private var showingPersonPaymentHistory = false
+    @State private var selectedBalanceForHistory: Balance?
     @State private var currentHouse: House?
     @State private var nudgeStates: [String: (canNudge: Bool, lastNudgeTime: Date?)] = [:]
     @State private var selectedTab = 0 // 0 = Balances, 1 = Transactions
@@ -79,8 +81,30 @@ struct ExpensesView: View {
             .sheet(isPresented: $showingAddExpense) {
                 AddExpenseView(viewModel: viewModel, houseMembers: houseMembers)
             }
-            .sheet(item: $selectedBalance) { balance in
-                SettlePaymentView(viewModel: viewModel, balance: balance)
+            .sheet(isPresented: $showingSettleUp) {
+                if let balance = selectedBalance,
+                   let houseId = authService.userProfile?.currentHouseId {
+                    SettleUpSheet(
+                        balance: balance,
+                        houseId: houseId,
+                        onPaymentRecorded: {
+                            Task {
+                                await loadNudgeStates()
+                            }
+                        }
+                    )
+                }
+            }
+            .sheet(isPresented: $showingPaymentHistory) {
+                PaymentHistoryView()
+            }
+            .sheet(isPresented: $showingPersonPaymentHistory) {
+                if let balance = selectedBalanceForHistory {
+                    PaymentHistoryView(
+                        filterUserId: balance.userId,
+                        filterUserName: balance.userName
+                    )
+                }
             }
             .sheet(item: $selectedExpense) { expense in
                 ExpenseDetailSheet(
@@ -144,17 +168,21 @@ struct ExpensesView: View {
                     currency: currency,
                     onSettle: { balance in
                         selectedBalance = balance
-                        showingSettlePayment = true
+                        showingSettleUp = true
                     },
                     onNudge: { balance in
                         sendNudge(for: balance)
                     },
                     onClearPayment: { balance in
-                        // TODO: Implement clear payment recording
-                        logger.info("Clear payment for \(balance.userName)")
+                        selectedBalance = balance
+                        showingSettleUp = true
                     },
                     onViewHistory: {
                         showingPaymentHistory = true
+                    },
+                    onViewPersonHistory: { balance in
+                        selectedBalanceForHistory = balance
+                        showingPersonPaymentHistory = true
                     },
                     nudgeStates: nudgeStates
                 )

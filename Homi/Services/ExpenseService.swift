@@ -276,6 +276,18 @@ class ExpenseService: ObservableObject {
             }
         }
 
+        // Subtract recorded payments from balances
+        for payment in payments {
+            // If current user received payment
+            if payment.toUserId == currentUserId {
+                balanceDict[payment.fromUserId]?.owedToYou -= payment.amount
+            }
+            // If current user made payment
+            else if payment.fromUserId == currentUserId {
+                balanceDict[payment.toUserId]?.youOwe -= payment.amount
+            }
+        }
+
         // Filter out zero balances
         return balanceDict.values.filter { $0.netBalance != 0 }
     }

@@ -1,339 +1,306 @@
 import SwiftUI
-import Combine
 import FirebaseAuth
 
 // MARK: - Settle Up Sheet
 
 struct SettleUpSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var viewModel: SettleUpViewModel
+    @StateObject private var authService = AuthService.shared
 
     let balance: Balance
+    let houseId: String
+    var onPaymentRecorded: () -> Void
 
-    init(balance: Balance) {
-        self.balance = balance
-        _viewModel = StateObject(wrappedValue: SettleUpViewModel(balance: balance))
+    @State private var showRecordPayment = false
+    @State private var paymentAmount: String = ""
+    @State private var isProcessing = false
+    @State private var errorMessage: String?
+    @State private var showError = false
+
+    private var maxAmount: Double {
+        abs(balance.netBalance)
+    }
+
+    private var formattedMaxAmount: String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = "USD"
+        return formatter.string(from: NSNumber(value: maxAmount)) ?? "$0.00"
     }
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: Constants.Spacing.large) {
-                    // Amount to settle
-                    amountSection
-
-                    // Expenses being settled
-                    if !viewModel.unsettledExpenses.isEmpty {
-                        expensesSection
-                    }
-
-                    // Note field
-                    noteSection
-
-                    Spacer(minLength: Constants.Spacing.xxLarge)
+            VStack(spacing: Constants.Spacing.large) {
+                if !showRecordPayment {
+                    paymentOptionsView
+                } else {
+                    recordPaymentView
                 }
-                .padding(Constants.Spacing.screenPadding)
             }
-            .navigationTitle("Settle Up")
+            .padding(Constants.Spacing.large)
+            .navigationTitle("Settle Balance")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .foregroundColor(Constants.Colors.primary)
-                }
-
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Confirm") {
-                        Task {
-                            await settleUp()
+                    Button("Cancel") {
+                        if showRecordPayment {
+                            showRecordPayment = false
+                        } else {
+                            dismiss()
                         }
                     }
                     .foregroundColor(Constants.Colors.primary)
-                    .fontWeight(.semibold)
-                    .disabled(viewModel.isSending)
                 }
             }
-            .alert("Payment Recorded", isPresented: $viewModel.showSuccess) {
-                Button("OK") {
-                    dismiss()
-                }
+            .alert("Error", isPresented: $showError) {
+                Button("OK") { }
             } message: {
-                Text("Your payment has been recorded successfully.")
-            }
-            .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
-                Button("OK") {
-                    viewModel.errorMessage = nil
-                }
-            } message: {
-                if let error = viewModel.errorMessage {
+                if let error = errorMessage {
                     Text(error)
                 }
             }
         }
     }
 
-    // MARK: - Amount Section
+    // MARK: - Payment Options View
 
-    private var amountSection: some View {
+    private var paymentOptionsView: some View {
         VStack(spacing: Constants.Spacing.medium) {
-            // Large amount display
+            // Balance Info
             VStack(spacing: Constants.Spacing.small) {
-                Text("You're settling")
-                    .font(Constants.Typography.subheadline)
-                    .foregroundColor(Constants.Colors.textSecondary)
+                Text(balance.userName)
+                    .font(Constants.Typography.title2)
+                    .foregroundColor(Constants.Colors.textPrimary)
 
-                Text(balance.formattedBalance)
-                    .font(Constants.Typography.displayLarge)
-                    .foregroundColor(Constants.Colors.danger)
+                Text(formattedMaxAmount)
+                    .font(.system(size: 40, weight: .bold, design: .rounded))
+                    .foregroundColor(balance.netBalance > 0 ? Constants.Colors.success : Constants.Colors.danger)
 
-                HStack(spacing: 4) {
-                    Text("to")
-                        .font(Constants.Typography.body)
-                        .foregroundColor(Constants.Colors.textSecondary)
-
-                    Text(balance.userName)
-                        .font(Constants.Typography.bodyMedium)
-                        .foregroundColor(Constants.Colors.textPrimary)
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, Constants.Spacing.large)
-        }
-    }
-
-    // MARK: - Expenses Section
-
-    private var expensesSection: some View {
-        VStack(alignment: .leading, spacing: Constants.Spacing.medium) {
-            Text("Expenses Being Settled")
-                .font(Constants.Typography.headline)
-                .foregroundColor(Constants.Colors.textPrimary)
-                .padding(.horizontal, 4)
-
-            VStack(spacing: Constants.Spacing.small) {
-                ForEach(viewModel.unsettledExpenses) { expense in
-                    SettleUpExpenseRow(
-                        expense: expense,
-                        isSelected: viewModel.selectedExpenseIds.contains(expense.id),
-                        onToggle: {
-                            viewModel.toggleExpense(expense.id)
-                        }
-                    )
-                }
-            }
-
-            // Summary
-            HomiCard(shadowStyle: .subtle) {
-                VStack(spacing: Constants.Spacing.small) {
-                    HStack {
-                        Text("Total Amount")
-                            .font(Constants.Typography.bodyMedium)
-                            .foregroundColor(Constants.Colors.textPrimary)
-
-                        Spacer()
-
-                        Text(CurrencyFormatter.format(amount: viewModel.totalSelectedAmount))
-                            .font(Constants.Typography.title3)
-                            .foregroundColor(Constants.Colors.textPrimary)
-                    }
-
-                    HStack {
-                        Text("\(viewModel.selectedExpenseIds.count) expense\(viewModel.selectedExpenseIds.count == 1 ? "" : "s") selected")
-                            .font(Constants.Typography.caption1)
-                            .foregroundColor(Constants.Colors.textSecondary)
-
-                        Spacer()
-                    }
-                }
-                .padding(Constants.Spacing.cardPadding)
-            }
-        }
-    }
-
-    // MARK: - Note Section
-
-    private var noteSection: some View {
-        VStack(alignment: .leading, spacing: Constants.Spacing.small) {
-            Text("Note (Optional)")
-                .font(Constants.Typography.subheadline)
-                .foregroundColor(Constants.Colors.textSecondary)
-                .padding(.horizontal, 4)
-
-            HomiCard(shadowStyle: .subtle) {
-                TextField("Add a note", text: $viewModel.note, axis: .vertical)
+                Text(balance.netBalance > 0 ? "owes you" : "you owe")
                     .font(Constants.Typography.body)
-                    .lineLimit(3...6)
-                    .padding(Constants.Spacing.cardPadding)
+                    .foregroundColor(Constants.Colors.textSecondary)
             }
-        }
-    }
+            .padding(.bottom, Constants.Spacing.large)
 
-    // MARK: - Settle Up
+            Divider()
 
-    private func settleUp() async {
-        await viewModel.settleUp()
-    }
-}
+            // Payment Options
+            VStack(spacing: Constants.Spacing.medium) {
+                Text("How would you like to settle?")
+                    .font(Constants.Typography.headline)
+                    .foregroundColor(Constants.Colors.textPrimary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
-// MARK: - Settle Up Expense Row
-
-struct SettleUpExpenseRow: View {
-    let expense: Expense
-    let isSelected: Bool
-    let onToggle: () -> Void
-
-    @StateObject private var authService = AuthService.shared
-
-    var amountOwed: Double {
-        guard let currentUserId = authService.user?.uid,
-              let split = expense.splits.first(where: { $0.userId == currentUserId }) else {
-            return 0
-        }
-        return split.amount
-    }
-
-    var body: some View {
-        Button(action: {
-            HapticManager.selection()
-            onToggle()
-        }) {
-            HomiCard(shadowStyle: isSelected ? .medium : .subtle) {
-                HStack(spacing: Constants.Spacing.medium) {
-                    // Checkbox
-                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                        .font(.title3)
-                        .foregroundColor(isSelected ? Constants.Colors.primary : Constants.Colors.textSecondary)
-
-                    // Expense details
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(expense.description)
-                            .font(Constants.Typography.body)
-                            .foregroundColor(Constants.Colors.textPrimary)
-                            .lineLimit(1)
-
-                        HStack(spacing: 4) {
-                            HomiBadge(
-                                expense.category.rawValue,
-                                style: .neutral,
-                                size: .small
-                            )
-
-                            Text("•")
-                                .font(Constants.Typography.caption2)
-                                .foregroundColor(Constants.Colors.textSecondary)
-
-                            Text(expense.shortDate)
-                                .font(Constants.Typography.caption1)
-                                .foregroundColor(Constants.Colors.textSecondary)
-                        }
+                // Venmo (placeholder)
+                PaymentOptionButton(
+                    icon: "dollarsign.circle.fill",
+                    title: "Pay on Venmo",
+                    subtitle: "Coming soon",
+                    action: {
+                        // Placeholder for Venmo integration
                     }
+                )
+                .disabled(true)
+                .opacity(0.5)
 
-                    Spacer()
+                // PayPal (placeholder)
+                PaymentOptionButton(
+                    icon: "dollarsign.circle.fill",
+                    title: "Pay on PayPal",
+                    subtitle: "Coming soon",
+                    action: {
+                        // Placeholder for PayPal integration
+                    }
+                )
+                .disabled(true)
+                .opacity(0.5)
 
-                    // Amount owed
-                    Text(CurrencyFormatter.format(amount: amountOwed))
-                        .font(Constants.Typography.bodyMedium)
-                        .foregroundColor(Constants.Colors.textPrimary)
-                }
-                .padding(Constants.Spacing.cardPadding)
-                .overlay(
-                    RoundedRectangle(cornerRadius: Constants.CornerRadius.card)
-                        .stroke(
-                            isSelected ? Constants.Colors.primary.opacity(0.5) : Color.clear,
-                            lineWidth: 2
-                        )
+                // Record Payment
+                PaymentOptionButton(
+                    icon: "checkmark.circle.fill",
+                    title: "Record Completed Payment",
+                    subtitle: "Already paid outside the app",
+                    action: {
+                        paymentAmount = String(format: "%.2f", maxAmount)
+                        showRecordPayment = true
+                    }
                 )
             }
+
+            Spacer()
         }
-        .buttonStyle(PlainButtonStyle())
     }
-}
 
-// MARK: - Settle Up ViewModel
+    // MARK: - Record Payment View
 
-@MainActor
-class SettleUpViewModel: ObservableObject {
-    @Published var unsettledExpenses: [Expense] = []
-    @Published var selectedExpenseIds: Set<String> = []
-    @Published var note: String = ""
-    @Published var isSending = false
-    @Published var showSuccess = false
-    @Published var errorMessage: String?
+    private var recordPaymentView: some View {
+        VStack(spacing: Constants.Spacing.large) {
+            // Balance Info
+            VStack(spacing: Constants.Spacing.small) {
+                Text("Record Payment")
+                    .font(Constants.Typography.title2)
+                    .foregroundColor(Constants.Colors.textPrimary)
 
-    private let balance: Balance
-    private let expenseService = ExpenseService.shared
-    private let authService = AuthService.shared
-
-    var totalSelectedAmount: Double {
-        unsettledExpenses
-            .filter { selectedExpenseIds.contains($0.id) }
-            .compactMap { expense in
-                expense.splits.first(where: { $0.userId == authService.user?.uid })?.amount
+                Text("Maximum: \(formattedMaxAmount)")
+                    .font(Constants.Typography.body)
+                    .foregroundColor(Constants.Colors.textSecondary)
             }
-            .reduce(0, +)
-    }
 
-    init(balance: Balance) {
-        self.balance = balance
-        loadUnsettledExpenses()
-    }
+            Divider()
 
-    private func loadUnsettledExpenses() {
-        guard let currentUserId = authService.user?.uid else { return }
+            // Amount Input
+            VStack(alignment: .leading, spacing: Constants.Spacing.small) {
+                Text("Payment Amount")
+                    .font(Constants.Typography.headline)
+                    .foregroundColor(Constants.Colors.textPrimary)
 
-        // Filter unsettled expenses where current user owes the other person
-        unsettledExpenses = expenseService.expenses.filter { expense in
-            !expense.isSettled &&
-            expense.paidBy == balance.userId &&
-            expense.splits.contains(where: { $0.userId == currentUserId && !$0.isPaid })
+                HStack {
+                    Text("$")
+                        .font(Constants.Typography.title2)
+                        .foregroundColor(Constants.Colors.textPrimary)
+
+                    TextField("0.00", text: $paymentAmount)
+                        .font(Constants.Typography.title2)
+                        .keyboardType(.decimalPad)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                }
+            }
+            .padding(.vertical, Constants.Spacing.medium)
+
+            // Record Button
+            Button(action: {
+                Task {
+                    await recordPayment()
+                }
+            }) {
+                HStack {
+                    if isProcessing {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    } else {
+                        Text("Record Payment")
+                            .font(Constants.Typography.headline)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(isValidAmount ? Constants.Colors.primary : Color.gray.opacity(0.3))
+                .foregroundColor(.white)
+                .cornerRadius(Constants.CornerRadius.medium)
+            }
+            .disabled(!isValidAmount || isProcessing)
+
+            Spacer()
         }
-
-        // Auto-select all expenses by default
-        selectedExpenseIds = Set(unsettledExpenses.map { $0.id })
     }
 
-    func toggleExpense(_ expenseId: String) {
-        if selectedExpenseIds.contains(expenseId) {
-            selectedExpenseIds.remove(expenseId)
-        } else {
-            selectedExpenseIds.insert(expenseId)
-        }
+    // MARK: - Validation
+
+    private var isValidAmount: Bool {
+        guard let amount = Double(paymentAmount) else { return false }
+        return amount > 0 && amount <= maxAmount
     }
 
-    func settleUp() async {
-        guard let currentUserId = authService.user?.uid,
-              let currentUserName = authService.userProfile?.displayName,
-              let houseId = authService.userProfile?.currentHouseId,
-              !selectedExpenseIds.isEmpty else {
+    // MARK: - Actions
+
+    private func recordPayment() async {
+        guard let amount = Double(paymentAmount),
+              amount > 0,
+              amount <= maxAmount,
+              let currentUserId = authService.user?.uid,
+              let currentUserName = authService.userProfile?.displayName else {
+            errorMessage = "Please enter a valid amount up to \(formattedMaxAmount)"
+            showError = true
             return
         }
 
-        isSending = true
+        isProcessing = true
 
         do {
+            // Determine who is paying whom
+            let (fromUserId, fromUserName, toUserId, toUserName): (String, String, String, String)
+
+            if balance.netBalance > 0 {
+                // Balance owes you, so they are paying you
+                fromUserId = balance.userId
+                fromUserName = balance.userName
+                toUserId = currentUserId
+                toUserName = currentUserName
+            } else {
+                // You owe balance, so you are paying them
+                fromUserId = currentUserId
+                fromUserName = currentUserName
+                toUserId = balance.userId
+                toUserName = balance.userName
+            }
+
             let payment = Payment(
                 houseId: houseId,
-                fromUserId: currentUserId,
-                fromUserName: currentUserName,
-                toUserId: balance.userId,
-                toUserName: balance.userName,
-                amount: totalSelectedAmount,
-                expenseIds: Array(selectedExpenseIds),
-                note: note.isEmpty ? nil : note
+                fromUserId: fromUserId,
+                fromUserName: fromUserName,
+                toUserId: toUserId,
+                toUserName: toUserName,
+                amount: amount,
+                expenseIds: [], // Not tracking specific expenses for this flow
+                note: nil,
+                timestamp: Date()
             )
 
-            try await expenseService.recordPayment(payment: payment)
+            try await FirestoreService.shared.recordPayment(payment)
 
-            HapticManager.success()
-            showSuccess = true
+            await MainActor.run {
+                HapticManager.success()
+                isProcessing = false
+                onPaymentRecorded()
+                dismiss()
+            }
         } catch {
-            HapticManager.error()
-            errorMessage = error.localizedDescription
+            await MainActor.run {
+                HapticManager.error()
+                errorMessage = "Failed to record payment: \(error.localizedDescription)"
+                showError = true
+                isProcessing = false
+            }
         }
+    }
+}
 
-        isSending = false
+// MARK: - Payment Option Button
+
+struct PaymentOptionButton: View {
+    let icon: String
+    let title: String
+    let subtitle: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: Constants.Spacing.medium) {
+                Image(systemName: icon)
+                    .font(.system(size: 24))
+                    .foregroundColor(Constants.Colors.primary)
+                    .frame(width: 40, height: 40)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(Constants.Typography.headline)
+                        .foregroundColor(Constants.Colors.textPrimary)
+
+                    Text(subtitle)
+                        .font(Constants.Typography.caption1)
+                        .foregroundColor(Constants.Colors.textSecondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14))
+                    .foregroundColor(Constants.Colors.textSecondary)
+            }
+            .padding(Constants.Spacing.cardPadding)
+            .background(Constants.Colors.secondaryBackground)
+            .cornerRadius(Constants.CornerRadius.medium)
+        }
     }
 }
 
@@ -346,6 +313,8 @@ class SettleUpViewModel: ObservableObject {
             userName: "John Doe",
             owedToYou: 0,
             youOwe: 45.50
-        )
+        ),
+        houseId: "house123",
+        onPaymentRecorded: {}
     )
 }
