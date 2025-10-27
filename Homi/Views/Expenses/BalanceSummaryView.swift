@@ -8,7 +8,10 @@ struct BalanceSummaryView: View {
     let totalOwedToYou: Double
     var currency: String = "USD"
     var onSettle: ((Balance) -> Void)?
+    var onNudge: ((Balance) -> Void)?
+    var onClearPayment: ((Balance) -> Void)?
     var onViewHistory: (() -> Void)?
+    var nudgeStates: [String: (canNudge: Bool, lastNudgeTime: Date?)] = [:]
 
     private var netBalance: Double {
         totalOwedToYou - totalYouOwe
@@ -20,10 +23,15 @@ struct BalanceSummaryView: View {
             if !balances.isEmpty {
                 VStack(spacing: Constants.Spacing.small) {
                     ForEach(balances) { balance in
+                        let nudgeState = nudgeStates[balance.userId]
                         BalancePersonCard(
                             balance: balance,
                             currency: currency,
-                            onSettle: { onSettle?(balance) }
+                            onSettle: { onSettle?(balance) },
+                            onNudge: balance.netBalance > 0 ? { onNudge?(balance) } : nil,
+                            onClearPayment: balance.netBalance > 0 ? { onClearPayment?(balance) } : nil,
+                            lastNudgeTime: nudgeState?.lastNudgeTime,
+                            canNudge: nudgeState?.canNudge ?? true
                         )
                     }
                 }
@@ -62,6 +70,10 @@ struct BalancePersonCard: View {
     let balance: Balance
     var currency: String = "USD"
     var onSettle: (() -> Void)?
+    var onNudge: (() -> Void)?
+    var onClearPayment: (() -> Void)?
+    var lastNudgeTime: Date?
+    var canNudge: Bool = true
 
     private var balanceText: String {
         if balance.netBalance > 0 {
@@ -75,53 +87,125 @@ struct BalancePersonCard: View {
         balance.netBalance > 0 ? Constants.Colors.success : Constants.Colors.danger
     }
 
+    private var nudgeTimeText: String? {
+        guard let lastNudge = lastNudgeTime else { return nil }
+        let timeAgo = Date().timeIntervalSince(lastNudge)
+        let hours = Int(timeAgo / 3600)
+
+        if hours < 1 {
+            let minutes = Int(timeAgo / 60)
+            return "Nudged \(minutes)m ago"
+        } else if hours < 24 {
+            return "Nudged \(hours)h ago"
+        } else {
+            let days = hours / 24
+            return "Nudged \(days)d ago"
+        }
+    }
+
     var body: some View {
         HomiCard(shadowStyle: .subtle) {
-            HStack(spacing: Constants.Spacing.medium) {
-                // Avatar
-                Circle()
-                    .fill(Constants.Colors.tertiaryBackground)
-                    .frame(width: 44, height: 44)
-                    .overlay(
-                        Text(balance.userName.prefix(1).uppercased())
+            VStack(spacing: Constants.Spacing.small) {
+                HStack(spacing: Constants.Spacing.medium) {
+                    // Avatar
+                    Circle()
+                        .fill(Constants.Colors.tertiaryBackground)
+                        .frame(width: 44, height: 44)
+                        .overlay(
+                            Text(balance.userName.prefix(1).uppercased())
+                                .font(Constants.Typography.headline)
+                                .foregroundColor(Constants.Colors.primary)
+                        )
+
+                    // Name & Description
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(balance.userName)
                             .font(Constants.Typography.headline)
-                            .foregroundColor(Constants.Colors.primary)
-                    )
+                            .foregroundColor(Constants.Colors.textPrimary)
 
-                // Name & Description
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(balance.userName)
-                        .font(Constants.Typography.headline)
-                        .foregroundColor(Constants.Colors.textPrimary)
+                        Text(balance.netBalance > 0 ? "Owes you" : "You owe")
+                            .font(Constants.Typography.caption1)
+                            .foregroundColor(Constants.Colors.textSecondary)
+                    }
 
-                    Text(balance.netBalance > 0 ? "Owes you" : "You owe")
-                        .font(Constants.Typography.caption1)
-                        .foregroundColor(Constants.Colors.textSecondary)
-                }
+                    Spacer()
 
-                Spacer()
-
-                // Amount & Action
-                VStack(alignment: .trailing, spacing: 8) {
+                    // Amount
                     Text(formattedAmount(abs(balance.netBalance)))
                         .font(Constants.Typography.title3)
                         .foregroundColor(balanceColor)
+                }
 
-                    // Settle Up button (only if user owes money)
-                    if balance.netBalance < 0, let onSettle = onSettle {
-                        Button(action: {
-                            HapticManager.selection()
-                            onSettle()
-                        }) {
-                            Text("Settle Up")
-                                .font(Constants.Typography.caption1)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.white)
+                // Action buttons for money owed to you
+                if balance.netBalance > 0 {
+                    HStack(spacing: Constants.Spacing.small) {
+                        // Clear Payment button
+                        if let onClearPayment = onClearPayment {
+                            Button(action: {
+                                HapticManager.selection()
+                                onClearPayment()
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "checkmark.circle")
+                                        .font(.system(size: 14))
+                                    Text("Clear")
+                                        .font(Constants.Typography.caption1)
+                                        .fontWeight(.medium)
+                                }
+                                .foregroundColor(Constants.Colors.success)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 6)
-                                .background(Constants.Colors.primary)
+                                .background(Constants.Colors.success.opacity(0.1))
                                 .cornerRadius(Constants.CornerRadius.small)
+                            }
                         }
+
+                        Spacer()
+
+                        // Nudge status and button
+                        if let nudgeTime = nudgeTimeText {
+                            Text(nudgeTime)
+                                .font(.system(size: 11))
+                                .foregroundColor(Constants.Colors.textSecondary)
+                        }
+
+                        if let onNudge = onNudge {
+                            Button(action: {
+                                HapticManager.selection()
+                                onNudge()
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: canNudge ? "bell" : "bell.slash")
+                                        .font(.system(size: 14))
+                                    Text("Nudge")
+                                        .font(Constants.Typography.caption1)
+                                        .fontWeight(.medium)
+                                }
+                                .foregroundColor(canNudge ? Constants.Colors.primary : Constants.Colors.textSecondary)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background((canNudge ? Constants.Colors.primary : Constants.Colors.textSecondary).opacity(0.1))
+                                .cornerRadius(Constants.CornerRadius.small)
+                            }
+                            .disabled(!canNudge)
+                        }
+                    }
+                }
+
+                // Settle Up button (only if user owes money)
+                if balance.netBalance < 0, let onSettle = onSettle {
+                    Button(action: {
+                        HapticManager.selection()
+                        onSettle()
+                    }) {
+                        Text("Settle Up")
+                            .font(Constants.Typography.bodyMedium)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(Constants.Colors.primary)
+                            .cornerRadius(Constants.CornerRadius.medium)
                     }
                 }
             }

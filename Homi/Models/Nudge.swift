@@ -105,7 +105,7 @@ struct Nudge: Identifiable, Codable {
 
     // MARK: - Cooldown Check
 
-    static let cooldownHours: Double = 12
+    static let cooldownHours: Double = 24
 
     var isWithinCooldown: Bool {
         let cooldownInterval = Nudge.cooldownHours * 3600 // hours to seconds

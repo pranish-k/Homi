@@ -1,5 +1,6 @@
 import SwiftUI
 import OSLog
+import FirebaseFirestore
 
 // MARK: - Redesigned Expenses View (Clean & Minimal)
 
@@ -7,6 +8,7 @@ struct ExpensesView: View {
     @StateObject private var viewModel = ExpenseViewModel()
     @StateObject private var authService = AuthService.shared
     @StateObject private var firestoreService = FirestoreService.shared
+    @StateObject private var nudgeService = NudgeService.shared
 
     @State private var showingAddExpense = false
     @State private var houseMembers: [HouseMember] = []
@@ -15,6 +17,7 @@ struct ExpensesView: View {
     @State private var showingSettlePayment = false
     @State private var showingPaymentHistory = false
     @State private var currentHouse: House?
+    @State private var nudgeStates: [String: (canNudge: Bool, lastNudgeTime: Date?)] = [:]
 
     private let logger = Logger(subsystem: "com.homi.app", category: "ExpensesView")
 
@@ -130,9 +133,17 @@ struct ExpensesView: View {
                         selectedBalance = balance
                         showingSettlePayment = true
                     },
+                    onNudge: { balance in
+                        sendNudge(for: balance)
+                    },
+                    onClearPayment: { balance in
+                        // TODO: Implement clear payment recording
+                        logger.info("Clear payment for \(balance.userName)")
+                    },
                     onViewHistory: {
                         showingPaymentHistory = true
-                    }
+                    },
+                    nudgeStates: nudgeStates
                 )
                 .padding(.horizontal, Constants.Spacing.screenPadding)
             }
@@ -262,8 +273,108 @@ struct ExpensesView: View {
 
                 // Start listening to expenses
                 viewModel.startListening(houseId: houseId, houseMembers: members)
+
+                // Load nudge states for each balance
+                await loadNudgeStates()
             } catch {
                 logger.error("Error loading data: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    // MARK: - Nudge Functions
+
+    private func loadNudgeStates() async {
+        guard let currentUserId = authService.userProfile?.id else { return }
+
+        var states: [String: (canNudge: Bool, lastNudgeTime: Date?)] = [:]
+
+        for balance in viewModel.balances where balance.netBalance > 0 {
+            // Only check for balances where money is owed to you
+            let itemId = "balance_\(balance.userId)"
+            let canSend = await nudgeService.canSendNudge(
+                fromUserId: currentUserId,
+                toUserId: balance.userId,
+                itemId: itemId
+            )
+
+            // Get last nudge time
+            let lastNudgeTime = await getLastNudgeTime(
+                fromUserId: currentUserId,
+                toUserId: balance.userId,
+                itemId: itemId
+            )
+
+            states[balance.userId] = (canNudge: canSend, lastNudgeTime: lastNudgeTime)
+        }
+
+        await MainActor.run {
+            nudgeStates = states
+        }
+    }
+
+    private func getLastNudgeTime(fromUserId: String, toUserId: String, itemId: String) async -> Date? {
+        // Get the most recent nudge
+        do {
+            let cutoffDate = Date().addingTimeInterval(-Nudge.cooldownHours * 3600)
+            let db = Firestore.firestore()
+            let snapshot = try await db.collection(Constants.Collections.nudges)
+                .whereField("fromUserId", isEqualTo: fromUserId)
+                .whereField("toUserId", isEqualTo: toUserId)
+                .whereField("itemId", isEqualTo: itemId)
+                .whereField("timestamp", isGreaterThan: Timestamp(date: cutoffDate))
+                .order(by: "timestamp", descending: true)
+                .limit(to: 1)
+                .getDocuments()
+
+            guard let doc = snapshot.documents.first,
+                  let nudge = Nudge.fromFirestore(doc.data()) else {
+                return nil
+            }
+
+            return nudge.timestamp
+        } catch {
+            return nil
+        }
+    }
+
+    private func sendNudge(for balance: Balance) {
+        guard let currentUserId = authService.userProfile?.id,
+              let currentUserName = authService.userProfile?.displayName,
+              let houseId = authService.userProfile?.currentHouseId else {
+            return
+        }
+
+        let itemId = "balance_\(balance.userId)"
+        let amountFormatted = CurrencyFormatter.format(amount: abs(balance.netBalance), currencyCode: currency)
+
+        Task {
+            do {
+                try await nudgeService.sendNudge(
+                    houseId: houseId,
+                    fromUserId: currentUserId,
+                    fromUserName: currentUserName,
+                    toUserId: balance.userId,
+                    toUserName: balance.userName,
+                    type: .paymentOverdue,
+                    itemId: itemId,
+                    itemTitle: amountFormatted
+                )
+
+                // Show success feedback
+                await MainActor.run {
+                    HapticManager.success()
+                }
+
+                // Reload nudge states
+                await loadNudgeStates()
+
+                logger.info("Nudge sent successfully to \(balance.userName)")
+            } catch {
+                await MainActor.run {
+                    HapticManager.error()
+                }
+                logger.error("Failed to send nudge: \(error.localizedDescription)")
             }
         }
     }
