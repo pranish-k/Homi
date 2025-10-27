@@ -120,3 +120,88 @@
 [debug] [2025-10-26T22:37:10.045Z] >>> [apiv2][query] PATCH https://firebaserules.googleapis.com/v1/projects/homi-ios/releases/cloud.firestore/(default) [none]
 [debug] [2025-10-26T22:37:10.045Z] >>> [apiv2][body] PATCH https://firebaserules.googleapis.com/v1/projects/homi-ios/releases/cloud.firestore/(default) {"release":{"name":"projects/homi-ios/releases/cloud.firestore/(default)","rulesetName":"projects/homi-ios/rulesets/edb5843a-d1e1-4855-a224-94b975a3135a"}}
 [debug] [2025-10-26T22:37:10.408Z] <<< [apiv2][status] PATCH https://firebaserules.googleapis.com/v1/projects/homi-ios/releases/cloud.firestore/(default) 200
+[debug] [2025-10-26T23:25:17.733Z] ----------------------------------------------------------------------
+[debug] [2025-10-26T23:25:17.735Z] Command:       /opt/homebrew/Cellar/node/23.9.0/bin/node /opt/homebrew/bin/firebase deploy --only firestore:indexes
+[debug] [2025-10-26T23:25:17.735Z] CLI Version:   14.22.0
+[debug] [2025-10-26T23:25:17.735Z] Platform:      darwin
+[debug] [2025-10-26T23:25:17.735Z] Node Version:  v23.9.0
+[debug] [2025-10-26T23:25:17.735Z] Time:          Sun Oct 26 2025 19:25:17 GMT-0400 (Eastern Daylight Time)
+[debug] [2025-10-26T23:25:17.735Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-10-26T23:25:17.817Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-10-26T23:25:17.817Z] > authorizing via signed-in user (pranishkhanal22@gmail.com)
+[debug] [2025-10-26T23:25:17.818Z] [iam] checking project homi-ios for permissions ["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]
+[debug] [2025-10-26T23:25:17.818Z] Checked if tokens are valid: false, expires at: 1761521477636
+[debug] [2025-10-26T23:25:17.818Z] Checked if tokens are valid: false, expires at: 1761521477636
+[debug] [2025-10-26T23:25:17.818Z] > refreshing access token with scopes: []
+[debug] [2025-10-26T23:25:17.819Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-10-26T23:25:17.819Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-10-26T23:25:17.933Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-10-26T23:25:17.933Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-10-26T23:25:17.942Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/homi-ios:testIamPermissions [none]
+[debug] [2025-10-26T23:25:17.943Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/homi-ios:testIamPermissions x-goog-quota-user=projects/homi-ios
+[debug] [2025-10-26T23:25:17.943Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/homi-ios:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]}
+[debug] [2025-10-26T23:25:18.139Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/homi-ios:testIamPermissions 200
+[debug] [2025-10-26T23:25:18.139Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/homi-ios:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]}
+[info] 
+[info] === Deploying to 'homi-ios'...
+[info] 
+[info] i  deploying firestore 
+[info] i  firestore: ensuring required API firestore.googleapis.com is enabled... 
+[info] i  firestore: ensuring required API firestore.googleapis.com is enabled... 
+[debug] [2025-10-26T23:25:18.145Z] Checked if tokens are valid: true, expires at: 1761524716934
+[debug] [2025-10-26T23:25:18.145Z] Checked if tokens are valid: true, expires at: 1761524716934
+[debug] [2025-10-26T23:25:18.145Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/homi-ios/databases/(default) [none]
+[debug] [2025-10-26T23:25:18.405Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/homi-ios/databases/(default) 200
+[debug] [2025-10-26T23:25:18.406Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/homi-ios/databases/(default) {"name":"projects/homi-ios/databases/(default)","uid":"10f61a53-9d2b-43b0-b4d7-f3ebfc6ef16e","createTime":"2025-10-13T06:06:32.830891Z","updateTime":"2025-10-13T06:06:32.830891Z","locationId":"nam5","type":"FIRESTORE_NATIVE","concurrencyMode":"PESSIMISTIC","versionRetentionPeriod":"3600s","earliestVersionTime":"2025-10-26T22:25:18.404444Z","appEngineIntegrationMode":"DISABLED","keyPrefix":"s","pointInTimeRecoveryEnablement":"POINT_IN_TIME_RECOVERY_DISABLED","deleteProtectionState":"DELETE_PROTECTION_DISABLED","databaseEdition":"STANDARD","freeTier":true,"realtimeUpdatesMode":"REALTIME_UPDATES_MODE_ENABLED","etag":"IPK5m8SBw5ADMKqapqHMoJAD"}
+[info] i  firestore: reading indexes from firestore.indexes.json... 
+[info] i  cloud.firestore: checking firestore.rules for compilation errors... 
+[debug] [2025-10-26T23:25:18.408Z] Checked if tokens are valid: true, expires at: 1761524716934
+[debug] [2025-10-26T23:25:18.408Z] Checked if tokens are valid: true, expires at: 1761524716934
+[debug] [2025-10-26T23:25:18.408Z] >>> [apiv2][query] POST https://firebaserules.googleapis.com/v1/projects/homi-ios:test [none]
+[debug] [2025-10-26T23:25:18.408Z] >>> [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/homi-ios:test [omitted]
+[debug] [2025-10-26T23:25:18.673Z] <<< [apiv2][status] POST https://firebaserules.googleapis.com/v1/projects/homi-ios:test 200
+[debug] [2025-10-26T23:25:18.673Z] <<< [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/homi-ios:test {}
+[info] ✔  cloud.firestore: rules file firestore.rules compiled successfully 
+[info] i  firestore: deploying indexes... 
+[debug] [2025-10-26T23:25:18.676Z] Checked if tokens are valid: true, expires at: 1761524716934
+[debug] [2025-10-26T23:25:18.676Z] Checked if tokens are valid: true, expires at: 1761524716934
+[debug] [2025-10-26T23:25:18.676Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/homi-ios/databases/(default)/collectionGroups/-/indexes [none]
+[debug] [2025-10-26T23:25:18.741Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/homi-ios/databases/(default)/collectionGroups/-/indexes 200
+[debug] [2025-10-26T23:25:18.741Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/homi-ios/databases/(default)/collectionGroups/-/indexes {"indexes":[{"name":"projects/homi-ios/databases/(default)/collectionGroups/conversations/indexes/CICAgOjXh4EK","queryScope":"COLLECTION","fields":[{"fieldPath":"participantIds","arrayConfig":"CONTAINS"},{"fieldPath":"lastMessageTime","order":"DESCENDING"},{"fieldPath":"__name__","order":"DESCENDING"}],"state":"READY","density":"SPARSE_ALL"},{"name":"projects/homi-ios/databases/(default)/collectionGroups/nudges/indexes/CICAgJiUpoMK","queryScope":"COLLECTION","fields":[{"fieldPath":"toUserId","order":"ASCENDING"},{"fieldPath":"timestamp","order":"DESCENDING"},{"fieldPath":"__name__","order":"DESCENDING"}],"state":"CREATING","density":"SPARSE_ALL"}]}
+[debug] [2025-10-26T23:25:18.742Z] Checked if tokens are valid: true, expires at: 1761524716934
+[debug] [2025-10-26T23:25:18.742Z] Checked if tokens are valid: true, expires at: 1761524716934
+[debug] [2025-10-26T23:25:18.742Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/homi-ios/databases/(default)/collectionGroups/-/fields?filter=indexConfig.usesAncestorConfig=false OR ttlConfig:* [none]
+[debug] [2025-10-26T23:25:18.813Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/homi-ios/databases/(default)/collectionGroups/-/fields?filter=indexConfig.usesAncestorConfig=false OR ttlConfig:* 200
+[debug] [2025-10-26T23:25:18.813Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/homi-ios/databases/(default)/collectionGroups/-/fields?filter=indexConfig.usesAncestorConfig=false OR ttlConfig:* {"fields":[{"name":"projects/homi-ios/databases/(default)/collectionGroups/__default__/fields/*","indexConfig":{"indexes":[{"queryScope":"COLLECTION","fields":[{"fieldPath":"*","order":"ASCENDING"}],"state":"READY"},{"queryScope":"COLLECTION","fields":[{"fieldPath":"*","order":"DESCENDING"}],"state":"READY"},{"queryScope":"COLLECTION","fields":[{"fieldPath":"*","arrayConfig":"CONTAINS"}],"state":"READY"}]}}]}
+[debug] [2025-10-26T23:25:18.814Z] Checked if tokens are valid: true, expires at: 1761524716934
+[debug] [2025-10-26T23:25:18.814Z] Checked if tokens are valid: true, expires at: 1761524716934
+[debug] [2025-10-26T23:25:18.814Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/homi-ios/databases/(default) [none]
+[debug] [2025-10-26T23:25:18.862Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/homi-ios/databases/(default) 200
+[debug] [2025-10-26T23:25:24.902Z] ----------------------------------------------------------------------
+[debug] [2025-10-26T23:25:24.905Z] Command:       /opt/homebrew/Cellar/node/23.9.0/bin/node /opt/homebrew/bin/firebase firestore:indexes
+[debug] [2025-10-26T23:25:24.906Z] CLI Version:   14.22.0
+[debug] [2025-10-26T23:25:24.906Z] Platform:      darwin
+[debug] [2025-10-26T23:25:24.907Z] Node Version:  v23.9.0
+[debug] [2025-10-26T23:25:24.908Z] Time:          Sun Oct 26 2025 19:25:24 GMT-0400 (Eastern Daylight Time)
+[debug] [2025-10-26T23:25:24.908Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-10-26T23:25:24.998Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-10-26T23:25:24.999Z] > authorizing via signed-in user (pranishkhanal22@gmail.com)
+[debug] [2025-10-26T23:25:24.999Z] [iam] checking project homi-ios for permissions ["datastore.indexes.list","firebase.projects.get"]
+[debug] [2025-10-26T23:25:25.000Z] Checked if tokens are valid: true, expires at: 1761524716934
+[debug] [2025-10-26T23:25:25.000Z] Checked if tokens are valid: true, expires at: 1761524716934
+[debug] [2025-10-26T23:25:25.000Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/homi-ios:testIamPermissions [none]
+[debug] [2025-10-26T23:25:25.000Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/homi-ios:testIamPermissions x-goog-quota-user=projects/homi-ios
+[debug] [2025-10-26T23:25:25.000Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/homi-ios:testIamPermissions {"permissions":["datastore.indexes.list","firebase.projects.get"]}
+[debug] [2025-10-26T23:25:25.105Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/homi-ios:testIamPermissions 200
+[debug] [2025-10-26T23:25:25.105Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/homi-ios:testIamPermissions {"permissions":["datastore.indexes.list","firebase.projects.get"]}
+[debug] [2025-10-26T23:25:25.106Z] Checked if tokens are valid: true, expires at: 1761524716934
+[debug] [2025-10-26T23:25:25.106Z] Checked if tokens are valid: true, expires at: 1761524716934
+[debug] [2025-10-26T23:25:25.106Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/homi-ios/databases/(default)/collectionGroups/-/indexes [none]
+[debug] [2025-10-26T23:25:25.349Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/homi-ios/databases/(default)/collectionGroups/-/indexes 200
+[debug] [2025-10-26T23:25:25.349Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/homi-ios/databases/(default)/collectionGroups/-/indexes {"indexes":[{"name":"projects/homi-ios/databases/(default)/collectionGroups/conversations/indexes/CICAgOjXh4EK","queryScope":"COLLECTION","fields":[{"fieldPath":"participantIds","arrayConfig":"CONTAINS"},{"fieldPath":"lastMessageTime","order":"DESCENDING"},{"fieldPath":"__name__","order":"DESCENDING"}],"state":"READY","density":"SPARSE_ALL"},{"name":"projects/homi-ios/databases/(default)/collectionGroups/nudges/indexes/CICAgJiUpoMK","queryScope":"COLLECTION","fields":[{"fieldPath":"toUserId","order":"ASCENDING"},{"fieldPath":"timestamp","order":"DESCENDING"},{"fieldPath":"__name__","order":"DESCENDING"}],"state":"CREATING","density":"SPARSE_ALL"}]}
+[debug] [2025-10-26T23:25:25.350Z] Checked if tokens are valid: true, expires at: 1761524716934
+[debug] [2025-10-26T23:25:25.350Z] Checked if tokens are valid: true, expires at: 1761524716934
+[debug] [2025-10-26T23:25:25.350Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/homi-ios/databases/(default)/collectionGroups/-/fields?filter=indexConfig.usesAncestorConfig=false OR ttlConfig:* [none]
+[debug] [2025-10-26T23:25:25.404Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/homi-ios/databases/(default)/collectionGroups/-/fields?filter=indexConfig.usesAncestorConfig=false OR ttlConfig:* 200

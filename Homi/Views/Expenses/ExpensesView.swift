@@ -18,6 +18,7 @@ struct ExpensesView: View {
     @State private var showingPaymentHistory = false
     @State private var currentHouse: House?
     @State private var nudgeStates: [String: (canNudge: Bool, lastNudgeTime: Date?)] = [:]
+    @State private var selectedTab = 0 // 0 = Balances, 1 = Transactions
 
     private let logger = Logger(subsystem: "com.homi.app", category: "ExpensesView")
 
@@ -27,22 +28,34 @@ struct ExpensesView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: Constants.Spacing.sectionSpacing) {
-                    if authService.userProfile?.currentHouseId != nil {
-                        // Total Balance Summary (Top)
-                        totalBalanceHeader
-
-                        // Individual Balances Section
-                        balancesSection
-
-                        // Recent Expenses Section
-                        recentExpensesSection
-                    } else {
-                        noHouseView
+            VStack(spacing: 0) {
+                if authService.userProfile?.currentHouseId != nil {
+                    // Segmented Control
+                    Picker("View", selection: $selectedTab) {
+                        Text("Balances").tag(0)
+                        Text("Transactions").tag(1)
                     }
+                    .pickerStyle(SegmentedPickerStyle())
+                    .padding(.horizontal, Constants.Spacing.medium)
+                    .padding(.vertical, Constants.Spacing.small)
+
+                    // Content based on selected tab
+                    ScrollView {
+                        VStack(spacing: Constants.Spacing.sectionSpacing) {
+                            if selectedTab == 0 {
+                                // Balances Tab
+                                totalBalanceHeader
+                                balancesSection
+                            } else {
+                                // Transactions Tab
+                                transactionsSection
+                            }
+                        }
+                        .padding(.vertical, Constants.Spacing.medium)
+                    }
+                } else {
+                    noHouseView
                 }
-                .padding(.vertical, Constants.Spacing.medium)
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -150,11 +163,11 @@ struct ExpensesView: View {
         }
     }
 
-    // MARK: - Recent Expenses Section
+    // MARK: - Transactions Section
 
-    private var recentExpensesSection: some View {
+    private var transactionsSection: some View {
         VStack(alignment: .leading, spacing: Constants.Spacing.medium) {
-            Text("Recent Expenses")
+            Text("All Transactions")
                 .font(Constants.Typography.headline)
                 .padding(.horizontal, Constants.Spacing.screenPadding)
 
