@@ -2,6 +2,7 @@ import Foundation
 import Combine
 import FirebaseFirestore
 import FirebaseAuth
+import OSLog
 
 @MainActor
 class FirestoreService: ObservableObject {
@@ -9,6 +10,7 @@ class FirestoreService: ObservableObject {
 
     private let db = Firestore.firestore()
     private let auth = Auth.auth()
+    private let logger = Logger(subsystem: "com.homi.app", category: "FirestoreService")
 
     @Published var currentHouse: House?
     @Published var houseMembers: [HouseMember] = []
@@ -314,6 +316,42 @@ class FirestoreService: ObservableObject {
             errorMessage = error.localizedDescription
             throw error
         }
+    }
+
+    // MARK: - Admin Operations
+
+    func updateHouseName(houseId: String, name: String) async throws {
+        try await db.collection(Constants.Collections.houses)
+            .document(houseId)
+            .updateData(["name": name])
+
+        self.logger.info("House name updated successfully")
+    }
+
+    func removeMemberFromHouse(houseId: String, memberId: String) async throws {
+        let batch = db.batch()
+
+        // Remove member document
+        let memberRef = db.collection(Constants.Collections.houses)
+            .document(houseId)
+            .collection(Constants.Collections.members)
+            .document(memberId)
+        batch.deleteDocument(memberRef)
+
+        // Update house member count and memberIds
+        let houseRef = db.collection(Constants.Collections.houses).document(houseId)
+        batch.updateData([
+            "memberIds": FieldValue.arrayRemove([memberId]),
+            "memberCount": FieldValue.increment(Int64(-1))
+        ], forDocument: houseRef)
+
+        // Update user's currentHouseId to nil
+        let userRef = db.collection(Constants.Collections.users).document(memberId)
+        batch.updateData(["currentHouseId": FieldValue.delete()], forDocument: userRef)
+
+        try await batch.commit()
+
+        self.logger.info("Member removed from house successfully")
     }
 
     // MARK: - Helper Methods

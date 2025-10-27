@@ -8,6 +8,16 @@ struct SettingsView: View {
     @State private var showChangePassword = false
     @State private var showThemeSelection = false
     @State private var showNotificationSettings = false
+    @State private var showAdminPanel = false
+    @State private var currentHouse: House?
+
+    private var isHouseCreator: Bool {
+        guard let userId = authService.userProfile?.id,
+              let house = currentHouse else {
+            return false
+        }
+        return house.createdBy == userId
+    }
 
     var body: some View {
         NavigationStack {
@@ -55,6 +65,17 @@ struct SettingsView: View {
                         )
                     }
 
+                    // Admin Section (only for house creator)
+                    if isHouseCreator {
+                        SettingsSection(title: "Admin") {
+                            SettingsButton(
+                                icon: "crown.fill",
+                                title: "House Management",
+                                action: { showAdminPanel = true }
+                            )
+                        }
+                    }
+
                     // About Section
                     SettingsSection(title: "About") {
                         SettingsRow(
@@ -97,6 +118,28 @@ struct SettingsView: View {
             .sheet(isPresented: $showNotificationSettings) {
                 NotificationSettingsView()
             }
+            .sheet(isPresented: $showAdminPanel) {
+                AdminPanelView(house: $currentHouse)
+            }
+            .task {
+                await loadHouse()
+            }
+        }
+    }
+
+    // MARK: - Data Loading
+
+    private func loadHouse() async {
+        guard let houseId = authService.userProfile?.currentHouseId else { return }
+
+        do {
+            if let house = try await FirestoreService.shared.getHouse(id: houseId) {
+                await MainActor.run {
+                    currentHouse = house
+                }
+            }
+        } catch {
+            print("Error loading house: \(error)")
         }
     }
 }
