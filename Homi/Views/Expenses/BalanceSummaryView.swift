@@ -151,16 +151,16 @@ struct BalancePersonCard: View {
                                     onClearPayment()
                                 }) {
                                     HStack(spacing: 4) {
-                                        Image(systemName: "checkmark.circle")
+                                        Image(systemName: "checkmark.circle.fill")
                                             .font(.system(size: 14))
                                         Text("Clear Balance")
                                             .font(Constants.Typography.caption1)
-                                            .fontWeight(.medium)
+                                            .fontWeight(.semibold)
                                     }
-                                    .foregroundColor(Constants.Colors.success)
+                                    .foregroundColor(Constants.Colors.primary)
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 6)
-                                    .background(Constants.Colors.success.opacity(0.1))
+                                    .background(Constants.Colors.primary.opacity(0.15))
                                     .cornerRadius(Constants.CornerRadius.small)
                                 }
                             }
