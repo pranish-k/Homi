@@ -140,7 +140,7 @@ struct ChoresView: View {
                 Button {
                     showingAddChore = true
                 } label: {
-                    Text("Add Your First Chore")
+                    Text("Add Chore")
                         .font(.headline)
                         .foregroundColor(.white)
                         .padding(.horizontal, Constants.Spacing.large)

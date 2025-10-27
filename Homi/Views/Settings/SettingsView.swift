@@ -8,6 +8,7 @@ struct SettingsView: View {
     @State private var showChangePassword = false
     @State private var showThemeSelection = false
     @State private var showNotificationSettings = false
+    @State private var showMyHouse = false
     @State private var showAdminPanel = false
     @State private var currentHouse: House?
 
@@ -65,13 +66,13 @@ struct SettingsView: View {
                         )
                     }
 
-                    // Admin Section (only for house creator)
-                    if isHouseCreator {
-                        SettingsSection(title: "Admin") {
+                    // House Section (for all members)
+                    if authService.userProfile?.currentHouseId != nil {
+                        SettingsSection(title: "House") {
                             SettingsButton(
-                                icon: "crown.fill",
-                                title: "House Management",
-                                action: { showAdminPanel = true }
+                                icon: "house.fill",
+                                title: "My House",
+                                action: { showMyHouse = true }
                             )
                         }
                     }
@@ -117,6 +118,9 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showNotificationSettings) {
                 NotificationSettingsView()
+            }
+            .sheet(isPresented: $showMyHouse) {
+                MyHouseView()
             }
             .sheet(isPresented: $showAdminPanel) {
                 AdminPanelView(house: $currentHouse)

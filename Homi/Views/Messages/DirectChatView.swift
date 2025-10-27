@@ -101,16 +101,19 @@ struct DirectChatView: View {
                 }
                 .padding()
             }
+            .onAppear {
+                // Scroll to bottom when view first loads
+                if let lastMessage = viewModel.messages.last {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                    }
+                }
+            }
             .onChange(of: viewModel.messages.count) { oldCount, newCount in
                 if newCount > oldCount, let lastMessage = viewModel.messages.last {
                     withAnimation {
                         proxy.scrollTo(lastMessage.id, anchor: .bottom)
                     }
-                }
-            }
-            .onAppear {
-                if let lastMessage = viewModel.messages.last {
-                    proxy.scrollTo(lastMessage.id, anchor: .bottom)
                 }
             }
         }

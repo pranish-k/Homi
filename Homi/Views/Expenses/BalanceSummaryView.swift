@@ -150,18 +150,15 @@ struct BalancePersonCard: View {
                                     HapticManager.selection()
                                     onClearPayment()
                                 }) {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .font(.system(size: 14))
-                                        Text("Clear Balance")
-                                            .font(Constants.Typography.caption1)
-                                            .fontWeight(.semibold)
-                                    }
-                                    .foregroundColor(Constants.Colors.primary)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 6)
-                                    .background(Constants.Colors.primary.opacity(0.15))
-                                    .cornerRadius(Constants.CornerRadius.small)
+                                    Text("Clear Balance")
+                                        .font(Constants.Typography.caption1)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(Constants.Colors.primary)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(.white)
+                                        .cornerRadius(Constants.CornerRadius.small)
+                                        .shadow(color: Color.black.opacity(0.08), radius: 2, x: 0, y: 1)
                                 }
                             }
 
@@ -180,17 +177,18 @@ struct BalancePersonCard: View {
                                     onNudge()
                                 }) {
                                     HStack(spacing: 4) {
-                                        Image(systemName: canNudge ? "bell" : "bell.slash")
-                                            .font(.system(size: 14))
+                                        Image(systemName: canNudge ? "bell.fill" : "bell.slash.fill")
+                                            .font(.system(size: 12))
                                         Text("Nudge")
                                             .font(Constants.Typography.caption1)
-                                            .fontWeight(.medium)
+                                            .fontWeight(.semibold)
                                     }
                                     .foregroundColor(canNudge ? Constants.Colors.primary : Constants.Colors.textSecondary)
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 6)
-                                    .background((canNudge ? Constants.Colors.primary : Constants.Colors.textSecondary).opacity(0.1))
+                                    .background(.white)
                                     .cornerRadius(Constants.CornerRadius.small)
+                                    .shadow(color: Color.black.opacity(0.08), radius: 2, x: 0, y: 1)
                                 }
                                 .disabled(!canNudge)
                             }

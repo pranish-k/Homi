@@ -26,6 +26,14 @@ struct GroupChatView: View {
                     }
                     .padding(.vertical, Constants.Spacing.medium)
                 }
+                .onAppear {
+                    // Scroll to bottom when view first loads
+                    if let lastMessage = viewModel.messages.last {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                        }
+                    }
+                }
                 .onChange(of: viewModel.messages.count) { oldCount, newCount in
                     if newCount > oldCount {
                         // Auto-scroll to bottom when new message arrives
