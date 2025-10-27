@@ -104,11 +104,12 @@ service cloud.firestore {
         // Members can read all payments in their house
         allow read: if isMember(houseId);
 
-        // Members can create payments (paying someone)
+        // Members can create payments (either person in the transaction can record it)
         allow create: if isMember(houseId) &&
-          request.resource.data.fromUserId == request.auth.uid &&
           request.resource.data.houseId == houseId &&
-          request.resource.data.amount > 0;
+          request.resource.data.amount > 0 &&
+          (request.resource.data.fromUserId == request.auth.uid ||
+           request.resource.data.toUserId == request.auth.uid);
 
         // No one can update or delete payments (immutable record)
         allow update, delete: if false;
@@ -143,7 +144,6 @@ service cloud.firestore {
         // Members can create messages
         allow create: if isMember(houseId) &&
           request.resource.data.senderId == request.auth.uid &&
-          request.resource.data.houseId == houseId &&
           request.resource.data.content.size() > 0 &&
           request.resource.data.content.size() <= 5000;
 

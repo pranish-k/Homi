@@ -81,7 +81,9 @@ struct ExpensesView: View {
             .sheet(isPresented: $showingAddExpense) {
                 AddExpenseView(viewModel: viewModel, houseMembers: houseMembers)
             }
-            .sheet(isPresented: $showingSettleUp) {
+            .sheet(isPresented: $showingSettleUp, onDismiss: {
+                selectedBalance = nil
+            }) {
                 if let balance = selectedBalance,
                    let houseId = authService.userProfile?.currentHouseId {
                     SettleUpSheet(
@@ -93,6 +95,9 @@ struct ExpensesView: View {
                             }
                         }
                     )
+                } else {
+                    Text("Loading...")
+                        .padding()
                 }
             }
             .sheet(isPresented: $showingPaymentHistory) {

@@ -260,30 +260,14 @@ class PaymentHistoryViewModel: ObservableObject {
     }
 }
 
-// MARK: - Payment Extension for Relative Date
+// MARK: - Payment Extension for Exact Date
 
 extension Payment {
     var relativeDate: String {
-        let calendar = Calendar.current
-        let now = Date()
-
-        if calendar.isDateInToday(timestamp) {
-            let timeFormatter = DateFormatter()
-            timeFormatter.timeStyle = .short
-            return "Today at \(timeFormatter.string(from: timestamp))"
-        } else if calendar.isDateInYesterday(timestamp) {
-            return "Yesterday"
-        } else if let daysAgo = calendar.dateComponents([.day], from: timestamp, to: now).day {
-            if daysAgo < 7 {
-                return "\(daysAgo) days ago"
-            } else if daysAgo < 30 {
-                let weeksAgo = daysAgo / 7
-                return "\(weeksAgo) \(weeksAgo == 1 ? "week" : "weeks") ago"
-            }
-        }
-
-        // Fall back to formatted date
-        return formattedDate
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: timestamp)
     }
 }
 
