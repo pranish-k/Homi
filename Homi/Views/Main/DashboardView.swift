@@ -56,25 +56,11 @@ struct DashboardView: View {
                             }
                         }
 
-                        // Menu Button
-                        Menu {
-                            Button(action: {
-                                showSettings = true
-                            }) {
-                                Label("Settings", systemImage: "gear")
-                            }
-
-                            Button(action: {
-                                do {
-                                    try authService.signOut()
-                                } catch {
-                                    logger.error("Error signing out: \(error.localizedDescription)")
-                                }
-                            }) {
-                                Label("Sign Out", systemImage: "arrow.right.square")
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis.circle")
+                        // Settings Button
+                        Button(action: {
+                            showSettings = true
+                        }) {
+                            Image(systemName: "gearshape.fill")
                                 .font(.title3)
                                 .foregroundColor(Constants.Colors.primary)
                         }
