@@ -21,6 +21,7 @@ struct ExpensesView: View {
     @State private var currentHouse: House?
     @State private var nudgeStates: [String: (canNudge: Bool, lastNudgeTime: Date?)] = [:]
     @State private var selectedTab = 0 // 0 = Balances, 1 = Transactions
+    @State private var showingBalanceInfo = false
 
     private let logger = Logger(subsystem: "com.homi.app", category: "ExpensesView")
 
@@ -127,6 +128,9 @@ struct ExpensesView: View {
                     }
                 )
             }
+            .sheet(isPresented: $showingBalanceInfo) {
+                BalanceInfoSheet()
+            }
             .onAppear {
                 loadData()
             }
@@ -139,22 +143,63 @@ struct ExpensesView: View {
     // MARK: - Total Balance Header
 
     private var totalBalanceHeader: some View {
-        VStack(spacing: Constants.Spacing.small) {
-            Text("Your Balance")
-                .font(Constants.Typography.subheadline)
-                .foregroundColor(Constants.Colors.textSecondary)
+        VStack(spacing: Constants.Spacing.medium) {
+            // Top row: Two cards side by side
+            HStack(spacing: Constants.Spacing.medium) {
+                // You owe card
+                BalanceCardComponent(
+                    title: "You owe",
+                    amount: viewModel.getTotalYouOwe(),
+                    currency: currency,
+                    color: Constants.Colors.danger
+                )
 
-            Text(formattedNetBalance)
-                .font(Constants.Typography.display)
-                .foregroundColor(netBalanceColor)
+                // You are owed card
+                BalanceCardComponent(
+                    title: "You are owed",
+                    amount: viewModel.getTotalOwedToYou(),
+                    currency: currency,
+                    color: Constants.Colors.success
+                )
+            }
 
-            Text(netBalanceSubtitle)
-                .font(Constants.Typography.subheadline)
-                .foregroundColor(Constants.Colors.textSecondary)
+            // Overall balance card
+            HStack(spacing: 4) {
+                Text("Overall balance")
+                    .font(Constants.Typography.subheadline)
+                    .foregroundColor(Constants.Colors.textSecondary)
+
+                Button(action: {
+                    showingBalanceInfo = true
+                    HapticManager.selection()
+                }) {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 14))
+                        .foregroundColor(Constants.Colors.textSecondary)
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            HomiCard(shadowStyle: .subtle) {
+                HStack {
+                    Text(formattedNetBalance)
+                        .font(.system(size: 34, weight: .bold, design: .rounded))
+                        .foregroundColor(netBalanceColor)
+
+                    Spacer()
+
+                    if netBalance == 0 {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 28))
+                            .foregroundColor(Constants.Colors.success)
+                    }
+                }
+                .padding(Constants.Spacing.medium)
+            }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, Constants.Spacing.large)
         .padding(.horizontal, Constants.Spacing.screenPadding)
+        .padding(.vertical, Constants.Spacing.large)
     }
 
     // MARK: - Balances Section
@@ -422,6 +467,303 @@ struct ExpensesView: View {
                 }
                 logger.error("Failed to send nudge: \(error.localizedDescription)")
             }
+        }
+    }
+}
+
+// MARK: - Balance Info Sheet
+
+struct BalanceInfoSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Constants.Spacing.large) {
+                    // Header
+                    VStack(alignment: .leading, spacing: Constants.Spacing.small) {
+                        HStack {
+                            Image(systemName: "info.circle.fill")
+                                .font(.system(size: 32))
+                                .foregroundColor(Constants.Colors.primary)
+
+                            Spacer()
+                        }
+
+                        Text("Understanding Your Bills")
+                            .font(Constants.Typography.title2)
+                            .foregroundColor(Constants.Colors.textPrimary)
+
+                        Text("Here's how we track what you owe and what others owe you")
+                            .font(Constants.Typography.body)
+                            .foregroundColor(Constants.Colors.textSecondary)
+                    }
+
+                    Divider()
+
+                    // You Owe
+                    InfoSection(
+                        icon: "arrow.down.circle.fill",
+                        iconColor: Constants.Colors.danger,
+                        title: "You owe",
+                        description: "The total amount you need to pay back to all your housemates. This is calculated from expenses others paid that you participated in but haven't paid back yet."
+                    )
+
+                    // You Are Owed
+                    InfoSection(
+                        icon: "arrow.up.circle.fill",
+                        iconColor: Constants.Colors.success,
+                        title: "You are owed",
+                        description: "The total amount your housemates need to pay you back. This comes from expenses you paid that were split with others who haven't paid their share yet."
+                    )
+
+                    Divider()
+
+                    // Overall Balance Section
+                    InfoSection(
+                        icon: "chart.bar.fill",
+                        iconColor: Constants.Colors.primary,
+                        title: "Overall balance",
+                        description: "Your net financial position with all housemates. This is calculated as (You are owed) minus (You owe)."
+                    )
+
+                    // Positive Balance
+                    InfoSection(
+                        icon: "plus.circle.fill",
+                        iconColor: Constants.Colors.success,
+                        title: "Positive Overall Balance (Green)",
+                        description: "You're owed more than you owe overall. Your housemates owe you money on net."
+                    )
+
+                    // Negative Balance
+                    InfoSection(
+                        icon: "minus.circle.fill",
+                        iconColor: Constants.Colors.danger,
+                        title: "Negative Overall Balance (Red)",
+                        description: "You owe more than you're owed overall. You owe your housemates money on net."
+                    )
+
+                    // Settled Up
+                    InfoSection(
+                        icon: "checkmark.circle.fill",
+                        iconColor: Constants.Colors.textSecondary,
+                        title: "All Settled Up ($0.00)",
+                        description: "Your overall balance is zero! Either everyone has paid you back and you've paid everyone, or the amounts perfectly cancel out."
+                    )
+
+                    Divider()
+
+                    // Individual Balances
+                    VStack(alignment: .leading, spacing: Constants.Spacing.small) {
+                        HStack {
+                            Image(systemName: "person.2.fill")
+                                .font(.system(size: 20))
+                                .foregroundColor(Constants.Colors.primary)
+
+                            Text("Individual Balances")
+                                .font(Constants.Typography.headline)
+                                .foregroundColor(Constants.Colors.textPrimary)
+                        }
+
+                        Text("Below your total balance, you'll see a breakdown with each housemate:")
+                            .font(Constants.Typography.body)
+                            .foregroundColor(Constants.Colors.textSecondary)
+
+                        VStack(alignment: .leading, spacing: Constants.Spacing.xSmall) {
+                            BulletPoint(text: "\"Owes you\" - They need to pay you back")
+                            BulletPoint(text: "\"You owe\" - You need to pay them back")
+                        }
+                        .padding(.leading, Constants.Spacing.small)
+                    }
+
+                    Divider()
+
+                    // How It Works
+                    VStack(alignment: .leading, spacing: Constants.Spacing.small) {
+                        HStack {
+                            Image(systemName: "gearshape.fill")
+                                .font(.system(size: 20))
+                                .foregroundColor(Constants.Colors.primary)
+
+                            Text("How It Works")
+                                .font(Constants.Typography.headline)
+                                .foregroundColor(Constants.Colors.textPrimary)
+                        }
+
+                        VStack(alignment: .leading, spacing: Constants.Spacing.small) {
+                            NumberedStep(number: 1, text: "Someone pays for an expense (groceries, rent, etc.)")
+                            NumberedStep(number: 2, text: "The bill is split among selected housemates")
+                            NumberedStep(number: 3, text: "Everyone except the payer owes their share")
+                            NumberedStep(number: 4, text: "When you pay back, the balance updates automatically")
+                        }
+                    }
+
+                    Divider()
+
+                    // Example
+                    VStack(alignment: .leading, spacing: Constants.Spacing.small) {
+                        HStack {
+                            Image(systemName: "lightbulb.fill")
+                                .font(.system(size: 20))
+                                .foregroundColor(.yellow)
+
+                            Text("Example")
+                                .font(Constants.Typography.headline)
+                                .foregroundColor(Constants.Colors.textPrimary)
+                        }
+
+                        ExampleCard(
+                            scenario: "You paid $60 for groceries, split 3 ways",
+                            result: "Each person owes $20",
+                            yourBalance: "+$40",
+                            explanation: "Your 2 housemates each owe you $20"
+                        )
+                    }
+                }
+                .padding(Constants.Spacing.screenPadding)
+            }
+            .navigationTitle("Balance Guide")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .foregroundColor(Constants.Colors.primary)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Info Components
+
+struct InfoSection: View {
+    let icon: String
+    let iconColor: Color
+    let title: String
+    let description: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: Constants.Spacing.medium) {
+            Image(systemName: icon)
+                .font(.system(size: 24))
+                .foregroundColor(iconColor)
+                .frame(width: 32)
+
+            VStack(alignment: .leading, spacing: Constants.Spacing.xxSmall) {
+                Text(title)
+                    .font(Constants.Typography.bodyMedium)
+                    .foregroundColor(Constants.Colors.textPrimary)
+
+                Text(description)
+                    .font(Constants.Typography.body)
+                    .foregroundColor(Constants.Colors.textSecondary)
+            }
+        }
+    }
+}
+
+struct BulletPoint: View {
+    let text: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: Constants.Spacing.xSmall) {
+            Text("•")
+                .font(Constants.Typography.body)
+                .foregroundColor(Constants.Colors.textSecondary)
+
+            Text(text)
+                .font(Constants.Typography.body)
+                .foregroundColor(Constants.Colors.textSecondary)
+        }
+    }
+}
+
+struct NumberedStep: View {
+    let number: Int
+    let text: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: Constants.Spacing.small) {
+            Text("\(number).")
+                .font(Constants.Typography.bodyMedium)
+                .foregroundColor(Constants.Colors.primary)
+                .frame(width: 24, alignment: .leading)
+
+            Text(text)
+                .font(Constants.Typography.body)
+                .foregroundColor(Constants.Colors.textSecondary)
+        }
+    }
+}
+
+struct ExampleCard: View {
+    let scenario: String
+    let result: String
+    let yourBalance: String
+    let explanation: String
+
+    var body: some View {
+        HomiCard(shadowStyle: .subtle) {
+            VStack(alignment: .leading, spacing: Constants.Spacing.small) {
+                HStack {
+                    Image(systemName: "cart.fill")
+                        .foregroundColor(Constants.Colors.success)
+                    Text(scenario)
+                        .font(Constants.Typography.bodyMedium)
+                        .foregroundColor(Constants.Colors.textPrimary)
+                }
+
+                Text("→ \(result)")
+                    .font(Constants.Typography.body)
+                    .foregroundColor(Constants.Colors.textSecondary)
+                    .padding(.leading, Constants.Spacing.medium)
+
+                HStack {
+                    Text("Your Balance:")
+                        .font(Constants.Typography.body)
+                        .foregroundColor(Constants.Colors.textSecondary)
+
+                    Text(yourBalance)
+                        .font(Constants.Typography.bodyMedium)
+                        .foregroundColor(Constants.Colors.success)
+                }
+                .padding(.top, Constants.Spacing.xxSmall)
+
+                Text(explanation)
+                    .font(Constants.Typography.caption1)
+                    .foregroundColor(Constants.Colors.textSecondary)
+                    .italic()
+            }
+            .padding(Constants.Spacing.cardPadding)
+        }
+    }
+}
+
+// MARK: - Balance Card Component
+
+struct BalanceCardComponent: View {
+    let title: String
+    let amount: Double
+    let currency: String
+    let color: Color
+
+    var body: some View {
+        HomiCard(shadowStyle: .subtle) {
+            VStack(alignment: .leading, spacing: Constants.Spacing.xSmall) {
+                Text(title)
+                    .font(Constants.Typography.caption1)
+                    .foregroundColor(Constants.Colors.textSecondary)
+
+                Text(CurrencyFormatter.format(amount: amount, currencyCode: currency))
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundColor(amount > 0 ? color : Constants.Colors.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(Constants.Spacing.medium)
         }
     }
 }

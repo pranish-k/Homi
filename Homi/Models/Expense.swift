@@ -19,6 +19,10 @@ struct Expense: Identifiable, Codable, Equatable {
     let isSettled: Bool
     let createdAt: Date
     let createdBy: String
+    let lastModifiedAt: Date?  // Audit trail: when was this expense last modified
+    let lastModifiedBy: String? // Audit trail: who last modified this expense
+    let deletedAt: Date?       // Soft delete: when was this expense deleted
+    let deletedBy: String?     // Soft delete: who deleted this expense
 
     init(id: String = UUID().uuidString,
          houseId: String,
@@ -31,7 +35,11 @@ struct Expense: Identifiable, Codable, Equatable {
          splits: [ExpenseSplit],
          isSettled: Bool = false,
          createdAt: Date = Date(),
-         createdBy: String) {
+         createdBy: String,
+         lastModifiedAt: Date? = nil,
+         lastModifiedBy: String? = nil,
+         deletedAt: Date? = nil,
+         deletedBy: String? = nil) {
         self.id = id
         self.houseId = houseId
         self.amount = amount
@@ -44,11 +52,15 @@ struct Expense: Identifiable, Codable, Equatable {
         self.isSettled = isSettled
         self.createdAt = createdAt
         self.createdBy = createdBy
+        self.lastModifiedAt = lastModifiedAt
+        self.lastModifiedBy = lastModifiedBy
+        self.deletedAt = deletedAt
+        self.deletedBy = deletedBy
     }
 
     // Firestore conversion
     var asDictionary: [String: Any] {
-        return [
+        var dict: [String: Any] = [
             "id": id,
             "houseId": houseId,
             "amount": amount,
@@ -62,6 +74,22 @@ struct Expense: Identifiable, Codable, Equatable {
             "createdAt": Timestamp(date: createdAt),
             "createdBy": createdBy
         ]
+
+        // Add optional audit fields if present
+        if let lastModifiedAt = lastModifiedAt {
+            dict["lastModifiedAt"] = Timestamp(date: lastModifiedAt)
+        }
+        if let lastModifiedBy = lastModifiedBy {
+            dict["lastModifiedBy"] = lastModifiedBy
+        }
+        if let deletedAt = deletedAt {
+            dict["deletedAt"] = Timestamp(date: deletedAt)
+        }
+        if let deletedBy = deletedBy {
+            dict["deletedBy"] = deletedBy
+        }
+
+        return dict
     }
 
     static func fromFirestore(_ data: [String: Any]) -> Expense? {
@@ -83,6 +111,12 @@ struct Expense: Identifiable, Codable, Equatable {
 
         let splits = splitsData.compactMap { ExpenseSplit.fromFirestore($0) }
 
+        // Parse optional audit fields
+        let lastModifiedAt = (data["lastModifiedAt"] as? Timestamp)?.dateValue()
+        let lastModifiedBy = data["lastModifiedBy"] as? String
+        let deletedAt = (data["deletedAt"] as? Timestamp)?.dateValue()
+        let deletedBy = data["deletedBy"] as? String
+
         return Expense(
             id: id,
             houseId: houseId,
@@ -95,7 +129,11 @@ struct Expense: Identifiable, Codable, Equatable {
             splits: splits,
             isSettled: isSettled,
             createdAt: createdAtTimestamp.dateValue(),
-            createdBy: createdBy
+            createdBy: createdBy,
+            lastModifiedAt: lastModifiedAt,
+            lastModifiedBy: lastModifiedBy,
+            deletedAt: deletedAt,
+            deletedBy: deletedBy
         )
     }
 

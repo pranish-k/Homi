@@ -134,15 +134,37 @@ class ExpenseViewModel: ObservableObject {
         let splits: [ExpenseSplit]
 
         if splitType == .equal {
-            let splitAmount = amountValue / Double(selectedParticipants.count)
-            splits = selectedParticipants.map { participantId in
+            // Calculate equal splits with proper rounding
+            // Use integer cents to avoid floating point errors
+            let totalCents = Int(round(amountValue * 100))
+            let participantCount = selectedParticipants.count
+            let baseSplitCents = totalCents / participantCount
+            let remainderCents = totalCents % participantCount
+
+            // Convert participants to array for indexing
+            let participantArray = Array(selectedParticipants)
+
+            splits = participantArray.enumerated().map { (index, participantId) in
                 let member = members.first { $0.id == participantId }
+                // Distribute remainder cents to first N participants
+                let splitCents = baseSplitCents + (index < remainderCents ? 1 : 0)
+                let splitAmount = Double(splitCents) / 100.0
+
                 return ExpenseSplit(
                     userId: participantId,
                     userName: member?.displayName ?? "Unknown",
                     amount: splitAmount,
                     isPaid: participantId == selectedPayer
                 )
+            }
+
+            // Validate splits sum exactly to total
+            let totalSplit = splits.reduce(0.0) { $0 + $1.amount }
+            let difference = abs(totalSplit - amountValue)
+            if difference > 0.001 { // Allow tiny floating point variance
+                errorMessage = "Split calculation error. Please try again."
+                showError = true
+                return
             }
         } else {
             // Custom splits
@@ -162,10 +184,21 @@ class ExpenseViewModel: ObservableObject {
                 )
             }
 
-            // Validate custom splits sum to total
+            // Validate custom splits sum to total (strict validation)
             let totalSplit = splits.reduce(0.0) { $0 + $1.amount }
-            if abs(totalSplit - amountValue) > 0.01 {
-                errorMessage = "Split amounts must add up to total amount"
+            let difference = abs(totalSplit - amountValue)
+
+            if difference > 0.01 {
+                let formattedTotal = String(format: "%.2f", amountValue)
+                let formattedSplitSum = String(format: "%.2f", totalSplit)
+                errorMessage = "Split amounts ($\(formattedSplitSum)) must exactly equal total amount ($\(formattedTotal))"
+                showError = true
+                return
+            }
+
+            // Ensure no split has negative or zero amount
+            if splits.contains(where: { $0.amount <= 0 }) {
+                errorMessage = "All split amounts must be greater than zero"
                 showError = true
                 return
             }

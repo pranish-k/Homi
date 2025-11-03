@@ -80,6 +80,7 @@ class ExpenseService: ObservableObject {
                 self.expenses = documents.compactMap { doc in
                     Expense.fromFirestore(doc.data())
                 }
+                .filter { $0.deletedAt == nil } // Filter out soft-deleted expenses
 
                 // Reset retry count on successful connection
                 self.retryCount = 0
@@ -117,8 +118,29 @@ class ExpenseService: ObservableObject {
         try await expenseRef.updateData(expense.asDictionary)
     }
 
-    /// Delete an expense
+    /// Soft delete an expense (marks as deleted but preserves data)
+    /// This maintains financial audit trail and allows recovery if needed
     func deleteExpense(houseId: String, expenseId: String) async throws {
+        guard let currentUserId = Auth.auth().currentUser?.uid else {
+            throw NSError(domain: "ExpenseService", code: -1,
+                         userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
+        }
+
+        let expenseRef = db.collection(Constants.Collections.houses)
+            .document(houseId)
+            .collection(Constants.Collections.expenses)
+            .document(expenseId)
+
+        // Soft delete: mark as deleted instead of removing from database
+        try await expenseRef.updateData([
+            "deletedAt": Timestamp(date: Date()),
+            "deletedBy": currentUserId
+        ])
+    }
+
+    /// Hard delete an expense (permanent deletion - use with caution)
+    /// Only for admin/cleanup purposes. Regular users should use soft delete.
+    func permanentlyDeleteExpense(houseId: String, expenseId: String) async throws {
         try await db.collection(Constants.Collections.houses)
             .document(houseId)
             .collection(Constants.Collections.expenses)
@@ -161,48 +183,101 @@ class ExpenseService: ObservableObject {
 
     // MARK: - Payment Operations
 
-    /// Record a payment
+    /// Record a payment using Firestore transactions to prevent race conditions
+    /// This ensures atomicity and consistency even with concurrent payments
     func recordPayment(payment: Payment) async throws {
-        let batch = db.batch()
-
-        // Add payment document
-        let paymentRef = db.collection(Constants.Collections.houses)
-            .document(payment.houseId)
-            .collection(Constants.Collections.payments)
-            .document(payment.id)
-
-        batch.setData(payment.asDictionary, forDocument: paymentRef)
-
-        // Mark related expense splits as paid
-        for expenseId in payment.expenseIds {
-            let expenseRef = db.collection(Constants.Collections.houses)
-                .document(payment.houseId)
-                .collection(Constants.Collections.expenses)
-                .document(expenseId)
-
-            // Get expense and update split
-            let expenseDoc = try await expenseRef.getDocument()
-            if let expense = Expense.fromFirestore(expenseDoc.data() ?? [:]) {
-                var updatedSplits = expense.splits
-                if let index = updatedSplits.firstIndex(where: { $0.userId == payment.fromUserId }) {
-                    updatedSplits[index] = ExpenseSplit(
-                        userId: updatedSplits[index].userId,
-                        userName: updatedSplits[index].userName,
-                        amount: updatedSplits[index].amount,
-                        isPaid: true
-                    )
-                }
-
-                let allPaid = updatedSplits.allSatisfy { $0.isPaid }
-
-                batch.updateData([
-                    "splits": updatedSplits.map { $0.asDictionary },
-                    "isSettled": allPaid
-                ], forDocument: expenseRef)
-            }
+        // Validate payment before processing
+        guard payment.amount > 0 else {
+            throw NSError(domain: "ExpenseService", code: -1,
+                         userInfo: [NSLocalizedDescriptionKey: "Payment amount must be greater than 0"])
         }
 
-        try await batch.commit()
+        // Use transaction instead of batch to prevent race conditions
+        try await db.runTransaction { (transaction, errorPointer) -> Any? in
+            do {
+                // 1. Check for duplicate payment (idempotency)
+                let paymentRef = self.db.collection(Constants.Collections.houses)
+                    .document(payment.houseId)
+                    .collection(Constants.Collections.payments)
+                    .document(payment.id)
+
+                let existingPayment = try transaction.getDocument(paymentRef)
+                if existingPayment.exists {
+                    // Payment already exists - this is a duplicate request
+                    errorPointer?.pointee = NSError(domain: "ExpenseService", code: -2,
+                        userInfo: [NSLocalizedDescriptionKey: "Payment already recorded"])
+                    return nil
+                }
+
+                // 2. Add payment document
+                transaction.setData(payment.asDictionary, forDocument: paymentRef)
+
+                // 3. Calculate total amount to allocate from this payment
+                var remainingAmount = payment.amount
+                var expensesToUpdate: [(ref: DocumentReference, splits: [ExpenseSplit], allPaid: Bool)] = []
+
+                // 4. Process each expense in the payment
+                for expenseId in payment.expenseIds {
+                    guard remainingAmount > 0 else { break }
+
+                    let expenseRef = self.db.collection(Constants.Collections.houses)
+                        .document(payment.houseId)
+                        .collection(Constants.Collections.expenses)
+                        .document(expenseId)
+
+                    // Read expense within transaction (consistent read)
+                    let expenseDoc = try transaction.getDocument(expenseRef)
+                    guard let expenseData = expenseDoc.data(),
+                          let expense = Expense.fromFirestore(expenseData) else {
+                        continue
+                    }
+
+                    // Find the split for the payer
+                    var updatedSplits = expense.splits
+                    if let index = updatedSplits.firstIndex(where: {
+                        $0.userId == payment.fromUserId && !$0.isPaid
+                    }) {
+                        let splitAmount = updatedSplits[index].amount
+
+                        // Allocate payment to this split
+                        if remainingAmount >= splitAmount {
+                            // Full payment for this split
+                            updatedSplits[index] = ExpenseSplit(
+                                userId: updatedSplits[index].userId,
+                                userName: updatedSplits[index].userName,
+                                amount: updatedSplits[index].amount,
+                                isPaid: true
+                            )
+                            remainingAmount -= splitAmount
+                        } else {
+                            // Partial payment not supported - skip this expense
+                            // In future: implement split subdivision for partial payments
+                            continue
+                        }
+
+                        // Check if all splits are now paid
+                        let allPaid = updatedSplits.allSatisfy { $0.isPaid }
+
+                        expensesToUpdate.append((ref: expenseRef, splits: updatedSplits, allPaid: allPaid))
+                    }
+                }
+
+                // 5. Update all expenses within the same transaction
+                for (expenseRef, splits, allPaid) in expensesToUpdate {
+                    transaction.updateData([
+                        "splits": splits.map { $0.asDictionary },
+                        "isSettled": allPaid,
+                        "lastModifiedAt": Timestamp(date: Date()),
+                        "lastModifiedBy": payment.fromUserId
+                    ], forDocument: expenseRef)
+                }
+
+                return nil
+            } catch {
+                errorPointer?.pointee = error as NSError
+                return nil
+            }
+        }
     }
 
     /// Get payment history for a house

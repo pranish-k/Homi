@@ -6,6 +6,7 @@ import FirebaseAuth
 struct SettleUpSheet: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var authService = AuthService.shared
+    @StateObject private var expenseService = ExpenseService.shared
 
     let balance: Balance
     let houseId: String
@@ -234,6 +235,20 @@ struct SettleUpSheet: View {
                 toUserName = balance.userName
             }
 
+            // Find relevant unsettled expenses for this payment
+            // These are expenses where:
+            // - The payer (toUserId) paid the original expense
+            // - The debtor (fromUserId) has an unpaid split
+            let relevantExpenses = expenseService.expenses.filter { expense in
+                !expense.isSettled &&
+                expense.paidBy == toUserId &&
+                expense.splits.contains { split in
+                    split.userId == fromUserId && !split.isPaid
+                }
+            }
+
+            let expenseIds = relevantExpenses.map { $0.id }
+
             let payment = Payment(
                 houseId: houseId,
                 fromUserId: fromUserId,
@@ -241,12 +256,12 @@ struct SettleUpSheet: View {
                 toUserId: toUserId,
                 toUserName: toUserName,
                 amount: amount,
-                expenseIds: [], // Not tracking specific expenses for this flow
+                expenseIds: expenseIds, // Now properly linking to actual expenses
                 note: nil,
                 timestamp: Date()
             )
 
-            try await FirestoreService.shared.recordPayment(payment)
+            try await ExpenseService.shared.recordPayment(payment: payment)
 
             await MainActor.run {
                 HapticManager.success()

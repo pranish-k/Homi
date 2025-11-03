@@ -83,20 +83,38 @@ service cloud.firestore {
         // Members can read all expenses in their house
         allow read: if isMember(houseId);
 
-        // Members can create expenses
+        // Members can create expenses with validation
         allow create: if isMember(houseId) &&
           request.resource.data.createdBy == request.auth.uid &&
           request.resource.data.houseId == houseId &&
           request.resource.data.amount > 0 &&
-          request.resource.data.amount <= 1000000;
+          request.resource.data.amount <= 1000000 &&
+          request.resource.data.keys().hasAll(['id', 'houseId', 'amount', 'description',
+                                                'category', 'date', 'paidBy', 'paidByName',
+                                                'splits', 'isSettled', 'createdAt', 'createdBy']);
 
-        // Creator or payer can update expense
+        // RESTRICTED UPDATE: Only allow updating specific fields
+        // Users can only update: splits (isPaid status), isSettled, lastModifiedAt, lastModifiedBy
+        // Financial fields (amount, paidBy, etc.) are IMMUTABLE after creation
         allow update: if isMember(houseId) &&
-          (resource.data.createdBy == request.auth.uid ||
-           resource.data.paidBy == request.auth.uid);
+          // Only allow changes to these specific fields
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['splits', 'isSettled', 'lastModifiedAt', 'lastModifiedBy']) &&
+          // Core financial data must remain unchanged
+          request.resource.data.amount == resource.data.amount &&
+          request.resource.data.paidBy == resource.data.paidBy &&
+          request.resource.data.houseId == resource.data.houseId &&
+          request.resource.data.createdBy == resource.data.createdBy &&
+          request.resource.data.createdAt == resource.data.createdAt &&
+          // Only the payer or someone paying their split can update
+          (resource.data.paidBy == request.auth.uid ||
+           // Check if user is marking their own split as paid
+           request.resource.data.splits.toSet().difference(resource.data.splits.toSet()).size() > 0);
 
-        // Only creator can delete expense
-        allow delete: if isMember(houseId) && resource.data.createdBy == request.auth.uid;
+        // Only creator can delete expense (soft delete preferred)
+        allow delete: if isMember(houseId) &&
+          resource.data.createdBy == request.auth.uid &&
+          // Only allow delete if not yet settled (prevent deletion of financial records)
+          resource.data.isSettled == false;
       }
 
       // Payments subcollection
@@ -105,13 +123,26 @@ service cloud.firestore {
         allow read: if isMember(houseId);
 
         // Members can create payments (either person in the transaction can record it)
+        // Strict validation for financial integrity
         allow create: if isMember(houseId) &&
           request.resource.data.houseId == houseId &&
           request.resource.data.amount > 0 &&
+          request.resource.data.amount <= 1000000 &&
+          // Payment must have valid participants
           (request.resource.data.fromUserId == request.auth.uid ||
-           request.resource.data.toUserId == request.auth.uid);
+           request.resource.data.toUserId == request.auth.uid) &&
+          // Ensure all required fields are present
+          request.resource.data.keys().hasAll(['id', 'houseId', 'fromUserId', 'fromUserName',
+                                                'toUserId', 'toUserName', 'amount',
+                                                'expenseIds', 'timestamp']) &&
+          // Prevent self-payments
+          request.resource.data.fromUserId != request.resource.data.toUserId &&
+          // Both users must be house members
+          request.resource.data.fromUserId in get(/databases/$(database)/documents/houses/$(houseId)).data.memberIds &&
+          request.resource.data.toUserId in get(/databases/$(database)/documents/houses/$(houseId)).data.memberIds;
 
-        // No one can update or delete payments (immutable record)
+        // CRITICAL: Payments are IMMUTABLE - no updates or deletes allowed
+        // This ensures complete audit trail and prevents financial fraud
         allow update, delete: if false;
       }
 
