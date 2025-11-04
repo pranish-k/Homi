@@ -183,8 +183,8 @@ class ExpenseService: ObservableObject {
 
     // MARK: - Payment Operations
 
-    /// Record a payment using Firestore transactions to prevent race conditions
-    /// This ensures atomicity and consistency even with concurrent payments
+    /// Record a payment - simplified to just record the payment without updating expenses
+    /// Expenses will be marked as paid separately when needed
     func recordPayment(payment: Payment) async throws {
         // Validate payment before processing
         guard payment.amount > 0 else {
@@ -192,96 +192,23 @@ class ExpenseService: ObservableObject {
                          userInfo: [NSLocalizedDescriptionKey: "Payment amount must be greater than 0"])
         }
 
-        // Use transaction instead of batch to prevent race conditions
-        try await db.runTransaction { (transaction, errorPointer) -> Any? in
-            do {
-                // 1. Check for duplicate payment (idempotency)
-                let paymentRef = self.db.collection(Constants.Collections.houses)
-                    .document(payment.houseId)
-                    .collection(Constants.Collections.payments)
-                    .document(payment.id)
+        // Simply add the payment document
+        let paymentRef = db.collection(Constants.Collections.houses)
+            .document(payment.houseId)
+            .collection(Constants.Collections.payments)
+            .document(payment.id)
 
-                let existingPayment = try transaction.getDocument(paymentRef)
-                if existingPayment.exists {
-                    // Payment already exists - this is a duplicate request
-                    errorPointer?.pointee = NSError(domain: "ExpenseService", code: -2,
-                        userInfo: [NSLocalizedDescriptionKey: "Payment already recorded"])
-                    return nil
-                }
-
-                // 2. Add payment document
-                transaction.setData(payment.asDictionary, forDocument: paymentRef)
-
-                // 3. Calculate total amount to allocate from this payment
-                var remainingAmount = payment.amount
-                var expensesToUpdate: [(ref: DocumentReference, splits: [ExpenseSplit], allPaid: Bool)] = []
-
-                // 4. Process each expense in the payment
-                for expenseId in payment.expenseIds {
-                    guard remainingAmount > 0 else { break }
-
-                    let expenseRef = self.db.collection(Constants.Collections.houses)
-                        .document(payment.houseId)
-                        .collection(Constants.Collections.expenses)
-                        .document(expenseId)
-
-                    // Read expense within transaction (consistent read)
-                    let expenseDoc = try transaction.getDocument(expenseRef)
-                    guard let expenseData = expenseDoc.data(),
-                          let expense = Expense.fromFirestore(expenseData) else {
-                        continue
-                    }
-
-                    // Find the split for the payer
-                    var updatedSplits = expense.splits
-                    if let index = updatedSplits.firstIndex(where: {
-                        $0.userId == payment.fromUserId && !$0.isPaid
-                    }) {
-                        let splitAmount = updatedSplits[index].amount
-
-                        // Allocate payment to this split
-                        if remainingAmount >= splitAmount {
-                            // Full payment for this split
-                            updatedSplits[index] = ExpenseSplit(
-                                userId: updatedSplits[index].userId,
-                                userName: updatedSplits[index].userName,
-                                amount: updatedSplits[index].amount,
-                                isPaid: true
-                            )
-                            remainingAmount -= splitAmount
-                        } else {
-                            // Partial payment not supported - skip this expense
-                            // In future: implement split subdivision for partial payments
-                            continue
-                        }
-
-                        // Check if all splits are now paid
-                        let allPaid = updatedSplits.allSatisfy { $0.isPaid }
-
-                        expensesToUpdate.append((ref: expenseRef, splits: updatedSplits, allPaid: allPaid))
-                    }
-                }
-
-                // 5. Update all expenses within the same transaction
-                for (expenseRef, splits, allPaid) in expensesToUpdate {
-                    transaction.updateData([
-                        "splits": splits.map { $0.asDictionary },
-                        "isSettled": allPaid,
-                        "lastModifiedAt": Timestamp(date: Date()),
-                        "lastModifiedBy": payment.fromUserId
-                    ], forDocument: expenseRef)
-                }
-
-                return nil
-            } catch {
-                errorPointer?.pointee = error as NSError
-                return nil
-            }
-        }
+        try await paymentRef.setData(payment.asDictionary)
     }
 
-    /// Get payment history for a house
+    /// Get payment history for a house (returns cached data if listener is active)
     func getPaymentHistory(houseId: String) async throws -> [Payment] {
+        // If we already have cached payments from the listener, return them
+        if !payments.isEmpty && currentHouseId == houseId {
+            return payments
+        }
+
+        // Otherwise, fetch from Firestore
         let snapshot = try await db.collection(Constants.Collections.houses)
             .document(houseId)
             .collection(Constants.Collections.payments)

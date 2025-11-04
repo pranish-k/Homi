@@ -144,26 +144,28 @@ struct ExpensesView: View {
 
     private var totalBalanceHeader: some View {
         VStack(spacing: Constants.Spacing.medium) {
-            // Top row: Two cards side by side
+            // Top row: Two cards side by side (equal width)
             HStack(spacing: Constants.Spacing.medium) {
                 // You owe card
                 BalanceCardComponent(
-                    title: "You owe",
+                    title: "You Owe",
                     amount: viewModel.getTotalYouOwe(),
                     currency: currency,
                     color: Constants.Colors.danger
                 )
+                .frame(maxWidth: .infinity)
 
                 // You are owed card
                 BalanceCardComponent(
-                    title: "You are owed",
+                    title: "You Are Owed",
                     amount: viewModel.getTotalOwedToYou(),
                     currency: currency,
                     color: Constants.Colors.success
                 )
+                .frame(maxWidth: .infinity)
             }
 
-            // Overall balance card
+            // Overall balance label with info button (centered)
             HStack(spacing: 4) {
                 Text("Overall balance")
                     .font(Constants.Typography.subheadline)
@@ -179,24 +181,30 @@ struct ExpensesView: View {
                 }
                 .buttonStyle(PlainButtonStyle())
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .center)
 
+            // Overall balance card (centered and slightly narrower)
             HomiCard(shadowStyle: .subtle) {
                 HStack {
+                    Spacer()
+
                     Text(formattedNetBalance)
                         .font(.system(size: 34, weight: .bold, design: .rounded))
                         .foregroundColor(netBalanceColor)
-
-                    Spacer()
 
                     if netBalance == 0 {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 28))
                             .foregroundColor(Constants.Colors.success)
+                            .padding(.leading, Constants.Spacing.xSmall)
                     }
+
+                    Spacer()
                 }
                 .padding(Constants.Spacing.medium)
             }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, Constants.Spacing.large)
         }
         .padding(.horizontal, Constants.Spacing.screenPadding)
         .padding(.vertical, Constants.Spacing.large)
@@ -362,11 +370,14 @@ struct ExpensesView: View {
                     houseMembers = members
                 }
 
-                // Start listening to expenses
+                // Start listening to expenses and payments
                 viewModel.startListening(houseId: houseId, houseMembers: members)
+                ExpenseService.shared.startListeningToPayments(houseId: houseId)
 
-                // Load nudge states for each balance
-                await loadNudgeStates()
+                // Load nudge states in background (non-blocking)
+                Task {
+                    await loadNudgeStates()
+                }
             } catch {
                 logger.error("Error loading data: \(error.localizedDescription)")
             }
@@ -378,53 +389,89 @@ struct ExpensesView: View {
     private func loadNudgeStates() async {
         guard let currentUserId = authService.userProfile?.id else { return }
 
-        var states: [String: (canNudge: Bool, lastNudgeTime: Date?)] = [:]
+        // Get all balances where money is owed to you
+        let relevantBalances = viewModel.balances.filter { $0.netBalance > 0 }
 
-        for balance in viewModel.balances where balance.netBalance > 0 {
-            // Only check for balances where money is owed to you
-            let itemId = "balance_\(balance.userId)"
-            let canSend = await nudgeService.canSendNudge(
-                fromUserId: currentUserId,
-                toUserId: balance.userId,
-                itemId: itemId
-            )
-
-            // Get last nudge time
-            let lastNudgeTime = await getLastNudgeTime(
-                fromUserId: currentUserId,
-                toUserId: balance.userId,
-                itemId: itemId
-            )
-
-            states[balance.userId] = (canNudge: canSend, lastNudgeTime: lastNudgeTime)
+        guard !relevantBalances.isEmpty else {
+            await MainActor.run {
+                nudgeStates = [:]
+            }
+            return
         }
 
-        await MainActor.run {
-            nudgeStates = states
+        // Process each balance individually with a timeout
+        for balance in relevantBalances {
+            // Run each nudge check in parallel with a timeout to prevent blocking
+            Task {
+                let itemId = "balance_\(balance.userId)"
+
+                // Use canSendNudge which has built-in caching and optimization
+                let canSend = await nudgeService.canSendNudge(
+                    fromUserId: currentUserId,
+                    toUserId: balance.userId,
+                    itemId: itemId
+                )
+
+                // Get last nudge time with timeout protection
+                let lastNudgeTime = await withTimeout(seconds: 2) {
+                    await self.getLastNudgeTimeCached(
+                        fromUserId: currentUserId,
+                        toUserId: balance.userId,
+                        itemId: itemId
+                    )
+                }
+
+                await MainActor.run {
+                    self.nudgeStates[balance.userId] = (canNudge: canSend, lastNudgeTime: lastNudgeTime)
+                }
+            }
         }
     }
 
-    private func getLastNudgeTime(fromUserId: String, toUserId: String, itemId: String) async -> Date? {
-        // Get the most recent nudge
+    private func getLastNudgeTimeCached(fromUserId: String, toUserId: String, itemId: String) async -> Date? {
+        // Get the most recent nudge with simpler query (uses existing index)
         do {
             let cutoffDate = Date().addingTimeInterval(-Nudge.cooldownHours * 3600)
             let db = Firestore.firestore()
+
+            // Use a simpler query that doesn't require compound index
             let snapshot = try await db.collection(Constants.Collections.nudges)
                 .whereField("fromUserId", isEqualTo: fromUserId)
                 .whereField("toUserId", isEqualTo: toUserId)
                 .whereField("itemId", isEqualTo: itemId)
-                .whereField("timestamp", isGreaterThan: Timestamp(date: cutoffDate))
                 .order(by: "timestamp", descending: true)
                 .limit(to: 1)
                 .getDocuments()
 
             guard let doc = snapshot.documents.first,
-                  let nudge = Nudge.fromFirestore(doc.data()) else {
+                  let nudge = Nudge.fromFirestore(doc.data()),
+                  nudge.timestamp > cutoffDate else {
                 return nil
             }
 
             return nudge.timestamp
         } catch {
+            logger.error("Error fetching last nudge time: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    private func withTimeout<T>(seconds: Double, operation: @escaping () async -> T?) async -> T? {
+        return await withTaskGroup(of: T?.self) { group in
+            group.addTask {
+                await operation()
+            }
+
+            group.addTask {
+                try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+                return nil
+            }
+
+            // Return first completed result
+            if let result = await group.next() {
+                group.cancelAll()
+                return result
+            }
             return nil
         }
     }
@@ -505,7 +552,7 @@ struct BalanceInfoSheet: View {
                     InfoSection(
                         icon: "arrow.down.circle.fill",
                         iconColor: Constants.Colors.danger,
-                        title: "You owe",
+                        title: "Amount You Owe",
                         description: "The total amount you need to pay back to all your housemates. This is calculated from expenses others paid that you participated in but haven't paid back yet."
                     )
 
@@ -513,7 +560,7 @@ struct BalanceInfoSheet: View {
                     InfoSection(
                         icon: "arrow.up.circle.fill",
                         iconColor: Constants.Colors.success,
-                        title: "You are owed",
+                        title: "Amount You Are Owed",
                         description: "The total amount your housemates need to pay you back. This comes from expenses you paid that were split with others who haven't paid their share yet."
                     )
 
@@ -751,18 +798,22 @@ struct BalanceCardComponent: View {
 
     var body: some View {
         HomiCard(shadowStyle: .subtle) {
-            VStack(alignment: .leading, spacing: Constants.Spacing.xSmall) {
+            VStack(alignment: .leading, spacing: Constants.Spacing.small) {
                 Text(title)
                     .font(Constants.Typography.caption1)
                     .foregroundColor(Constants.Colors.textSecondary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 Text(CurrencyFormatter.format(amount: amount, currencyCode: currency))
                     .font(.system(size: 24, weight: .bold, design: .rounded))
                     .foregroundColor(amount > 0 ? color : Constants.Colors.textPrimary)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                    .minimumScaleFactor(0.6)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(minHeight: 80)
             .padding(Constants.Spacing.medium)
         }
     }

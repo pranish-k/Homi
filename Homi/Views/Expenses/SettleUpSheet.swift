@@ -210,12 +210,16 @@ struct SettleUpSheet: View {
               amount <= maxAmount,
               let currentUserId = authService.user?.uid,
               let currentUserName = authService.userProfile?.displayName else {
-            errorMessage = "Please enter a valid amount up to \(formattedMaxAmount)"
-            showError = true
+            await MainActor.run {
+                errorMessage = "Please enter a valid amount up to \(formattedMaxAmount)"
+                showError = true
+            }
             return
         }
 
-        isProcessing = true
+        await MainActor.run {
+            isProcessing = true
+        }
 
         do {
             // Determine who is paying whom
@@ -235,20 +239,8 @@ struct SettleUpSheet: View {
                 toUserName = balance.userName
             }
 
-            // Find relevant unsettled expenses for this payment
-            // These are expenses where:
-            // - The payer (toUserId) paid the original expense
-            // - The debtor (fromUserId) has an unpaid split
-            let relevantExpenses = expenseService.expenses.filter { expense in
-                !expense.isSettled &&
-                expense.paidBy == toUserId &&
-                expense.splits.contains { split in
-                    split.userId == fromUserId && !split.isPaid
-                }
-            }
-
-            let expenseIds = relevantExpenses.map { $0.id }
-
+            // Create payment with empty expense IDs
+            // The transaction will find and update the relevant expenses automatically
             let payment = Payment(
                 houseId: houseId,
                 fromUserId: fromUserId,
@@ -256,7 +248,7 @@ struct SettleUpSheet: View {
                 toUserId: toUserId,
                 toUserName: toUserName,
                 amount: amount,
-                expenseIds: expenseIds, // Now properly linking to actual expenses
+                expenseIds: [], // Empty - will be handled by transaction
                 note: nil,
                 timestamp: Date()
             )

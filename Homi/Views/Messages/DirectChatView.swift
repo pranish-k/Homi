@@ -62,18 +62,19 @@ struct DirectChatView: View {
     private var messagesList: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: Constants.Spacing.small) {
+                LazyVStack(spacing: Constants.Spacing.xSmall) {
                     ForEach(viewModel.groupMessagesByDate(), id: \.0) { date, messages in
                         // Date header
                         Text(date)
                             .font(Constants.Typography.caption1)
+                            .fontWeight(.semibold)
                             .foregroundColor(Constants.Colors.textSecondary)
-                            .padding(.vertical, Constants.Spacing.xSmall)
+                            .padding(.vertical, Constants.Spacing.small)
 
                         // Messages for this date
                         ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
                             let showAvatar = shouldShowAvatar(for: message, at: index, in: messages)
-                            let isLastMessage = (index == messages.count - 1)
+                            let isSameSenderAsPrevious = index > 0 && messages[index - 1].senderId == message.senderId
 
                             DirectMessageBubble(
                                 message: message,
@@ -86,16 +87,8 @@ struct DirectChatView: View {
                                 canDelete: viewModel.canDeleteMessage(message),
                                 showAvatar: showAvatar
                             )
+                            .padding(.top, isSameSenderAsPrevious ? 2 : 0)
                             .id(message.id)
-
-                            // Show timestamp for last message in the conversation
-                            if isLastMessage && messages.count > 0 {
-                                Text(message.formattedTime)
-                                    .font(.caption2)
-                                    .foregroundColor(Constants.Colors.textSecondary)
-                                    .frame(maxWidth: .infinity, alignment: .center)
-                                    .padding(.top, 2)
-                            }
                         }
                     }
                 }

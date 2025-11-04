@@ -38,10 +38,11 @@ struct PaymentHistoryView: View {
                     .foregroundColor(Constants.Colors.primary)
                 }
             }
-            .onAppear {
-                Task {
-                    await viewModel.loadPayments()
-                }
+            .task {
+                viewModel.startListening()
+            }
+            .onDisappear {
+                viewModel.stopListening()
             }
         }
     }
@@ -215,39 +216,59 @@ class PaymentHistoryViewModel: ObservableObject {
     private let expenseService = ExpenseService.shared
     private let authService = AuthService.shared
     private let filterUserId: String?
+    private var cancellables = Set<AnyCancellable>()
 
     init(filterUserId: String? = nil) {
         self.filterUserId = filterUserId
     }
 
-    func loadPayments() async {
+    func startListening() {
         guard let houseId = authService.userProfile?.currentHouseId,
-              let currentUserId = authService.user?.uid else { return }
+              let currentUserId = authService.user?.uid else {
+            isLoading = false
+            return
+        }
 
         isLoading = true
 
-        do {
-            let allPayments = try await expenseService.getPaymentHistory(houseId: houseId)
+        // Start listening to payments in the service if not already
+        Task { @MainActor in
+            expenseService.startListeningToPayments(houseId: houseId)
 
-            // Filter payments if userId is provided
-            if let filterUserId = filterUserId {
-                payments = allPayments.filter { payment in
-                    (payment.fromUserId == currentUserId && payment.toUserId == filterUserId) ||
-                    (payment.fromUserId == filterUserId && payment.toUserId == currentUserId)
-                }
-            } else {
-                // Show all payments involving current user
-                payments = allPayments.filter { payment in
-                    payment.fromUserId == currentUserId || payment.toUserId == currentUserId
-                }
+            // Add a timeout to prevent hanging
+            try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 second timeout
+            if self.payments.isEmpty && self.isLoading {
+                self.isLoading = false
             }
-
-            groupPaymentsByMonth()
-        } catch {
-            errorMessage = error.localizedDescription
         }
 
-        isLoading = false
+        // Subscribe to payments from ExpenseService
+        expenseService.$payments
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] allPayments in
+                guard let self = self else { return }
+
+                // Filter payments if userId is provided
+                if let filterUserId = self.filterUserId {
+                    self.payments = allPayments.filter { payment in
+                        (payment.fromUserId == currentUserId && payment.toUserId == filterUserId) ||
+                        (payment.fromUserId == filterUserId && payment.toUserId == currentUserId)
+                    }
+                } else {
+                    // Show all payments involving current user
+                    self.payments = allPayments.filter { payment in
+                        payment.fromUserId == currentUserId || payment.toUserId == currentUserId
+                    }
+                }
+
+                self.groupPaymentsByMonth()
+                self.isLoading = false
+            }
+            .store(in: &cancellables)
+    }
+
+    func stopListening() {
+        cancellables.removeAll()
     }
 
     private func groupPaymentsByMonth() {

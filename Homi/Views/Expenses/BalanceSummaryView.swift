@@ -54,7 +54,7 @@ struct BalanceSummaryView: View {
                         Image(systemName: "clock.arrow.circlepath")
                             .font(.system(size: 16))
 
-                        Text("View Payment History")
+                        Text("Complete Payment History")
                             .font(Constants.Typography.bodyMedium)
                     }
                     .foregroundColor(Constants.Colors.primary)
@@ -141,25 +141,29 @@ struct BalancePersonCard: View {
 
                 // Action buttons for money owed to you or owed by you
                 VStack(spacing: Constants.Spacing.small) {
-                    // Top row: Clear Balance and Nudge (only when they owe you)
+                    // Action row for when they owe you
                     if balance.netBalance > 0 {
                         HStack(spacing: Constants.Spacing.small) {
-                            // Clear Balance button
+                            // Record Payment button (always visible)
                             if let onClearPayment = onClearPayment {
                                 Button(action: {
                                     HapticManager.selection()
                                     onClearPayment()
                                 }) {
-                                    Text("Clear Balance")
-                                        .font(Constants.Typography.caption1)
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(Constants.Colors.primary)
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 6)
-                                        .background(.white)
-                                        .cornerRadius(Constants.CornerRadius.small)
-                                        .shadow(color: Color.black.opacity(0.08), radius: 2, x: 0, y: 1)
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "dollarsign.circle.fill")
+                                            .font(.system(size: 12))
+                                        Text("Record Payment")
+                                            .font(Constants.Typography.caption1)
+                                            .fontWeight(.semibold)
+                                    }
+                                    .foregroundColor(Constants.Colors.primary)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(Constants.Colors.primaryLight.opacity(0.3))
+                                    .cornerRadius(Constants.CornerRadius.small)
                                 }
+                                .buttonStyle(PlainButtonStyle())
                             }
 
                             Spacer()
@@ -186,10 +190,10 @@ struct BalancePersonCard: View {
                                     .foregroundColor(canNudge ? Constants.Colors.primary : Constants.Colors.textSecondary)
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 6)
-                                    .background(.white)
+                                    .background(canNudge ? Constants.Colors.primaryLight.opacity(0.3) : Constants.Colors.tertiaryBackground)
                                     .cornerRadius(Constants.CornerRadius.small)
-                                    .shadow(color: Color.black.opacity(0.08), radius: 2, x: 0, y: 1)
                                 }
+                                .buttonStyle(PlainButtonStyle())
                                 .disabled(!canNudge)
                             }
                         }
@@ -210,6 +214,7 @@ struct BalancePersonCard: View {
                                 .background(Constants.Colors.primary)
                                 .cornerRadius(Constants.CornerRadius.medium)
                         }
+                        .buttonStyle(PlainButtonStyle())
                     }
 
                     // View payment history button (for this person)
@@ -221,7 +226,7 @@ struct BalancePersonCard: View {
                             HStack(spacing: 4) {
                                 Image(systemName: "clock.arrow.circlepath")
                                     .font(.system(size: 12))
-                                Text("View Payments")
+                                Text("Payment History")
                                     .font(Constants.Typography.caption1)
                             }
                             .foregroundColor(Constants.Colors.textSecondary)

@@ -13,7 +13,7 @@ struct GroupChatView: View {
             // Messages List
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(spacing: Constants.Spacing.medium) {
+                    LazyVStack(spacing: Constants.Spacing.xSmall) {
                         if viewModel.isLoading && viewModel.messages.isEmpty {
                             ProgressView()
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -79,30 +79,35 @@ struct GroupChatView: View {
         ForEach(Array(viewModel.messages.enumerated()), id: \.element.id) { index, message in
             let isFromCurrentUser = message.isFromCurrentUser(userId: viewModel.currentUserId ?? "")
             let showAvatar = shouldShowAvatar(for: message, at: index)
-            let isLastMessage = (index == viewModel.messages.count - 1)
+            let showDateHeader = shouldShowDateHeader(for: message, at: index)
+            let isSameSenderAsPrevious = index > 0 && viewModel.messages[index - 1].senderId == message.senderId
 
-            MessageBubbleView(
-                message: message,
-                isFromCurrentUser: isFromCurrentUser,
-                showAvatar: showAvatar,
-                onDelete: {
-                    Task {
-                        await viewModel.deleteMessage(message)
-                    }
+            VStack(spacing: 0) {
+                // Date header
+                if showDateHeader {
+                    Text(message.sectionDateText)
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(Constants.Colors.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, Constants.Spacing.small)
+                        .padding(.top, index == 0 ? 0 : Constants.Spacing.small)
                 }
-            )
-            .padding(.horizontal, Constants.Spacing.medium)
-            .id(message.id)
 
-            // Show timestamp for last message in the conversation
-            if isLastMessage {
-                Text(message.formattedTime)
-                    .font(.caption2)
-                    .foregroundColor(Constants.Colors.textSecondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.top, 2)
-                    .padding(.horizontal, Constants.Spacing.medium)
+                MessageBubbleView(
+                    message: message,
+                    isFromCurrentUser: isFromCurrentUser,
+                    showAvatar: showAvatar,
+                    onDelete: {
+                        Task {
+                            await viewModel.deleteMessage(message)
+                        }
+                    }
+                )
+                .padding(.horizontal, Constants.Spacing.medium)
+                .padding(.top, isSameSenderAsPrevious ? 2 : 0)
             }
+            .id(message.id)
         }
     }
 
@@ -116,6 +121,16 @@ struct GroupChatView: View {
 
         let previousMessage = viewModel.messages[index - 1]
         return previousMessage.senderId != message.senderId
+    }
+
+    private func shouldShowDateHeader(for message: Message, at index: Int) -> Bool {
+        // Show date header if it's the first message or if the current message is from a different day than the previous one
+        if index == 0 {
+            return true
+        }
+
+        let previousMessage = viewModel.messages[index - 1]
+        return !message.isSameDay(as: previousMessage)
     }
 }
 
