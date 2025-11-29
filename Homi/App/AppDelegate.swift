@@ -76,11 +76,16 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         completionHandler(.newData)
     }
 
-    // Handle URL callbacks for OAuth (Google Sign-In, etc.)
+    // Handle URL callbacks for OAuth and Phone Auth reCAPTCHA
     func application(_ app: UIApplication,
                      open url: URL,
                      options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
-        // This will be used when Google Sign-In is implemented
+        // Handle Firebase Auth reCAPTCHA callback for phone authentication
+        if Auth.auth().canHandle(url) {
+            return true
+        }
+        
+        // Handle other URL schemes (Google Sign-In, etc.) here when implemented
         return false
     }
 }

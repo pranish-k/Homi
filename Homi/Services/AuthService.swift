@@ -66,8 +66,14 @@ class AuthService: NSObject, ObservableObject {
             try await createUserProfile(user: newUser)
 
             // Send verification email
-            try await result.user.sendEmailVerification()
-            logger.info("Verification email sent")
+            do {
+                try await result.user.sendEmailVerification()
+                logger.info("Verification email sent to: \(email)")
+            } catch {
+                // Log but don't fail signup if email verification fails
+                logger.error("Failed to send verification email: \(error.localizedDescription)")
+                // User is still created, they can request verification later
+            }
 
             isLoading = false
         } catch {
@@ -289,9 +295,20 @@ class AuthService: NSObject, ObservableObject {
 
     // MARK: - Google Sign In
 
-    func signInWithGoogle() async throws {
-        // This would require Google Sign-In SDK setup
-        // For now, we'll provide a placeholder
+    func signInWithGoogle(presenting: UIViewController? = nil) async throws {
+        // Get the client ID from GoogleService-Info.plist
+        guard let clientID = FirebaseApp.app()?.options.clientID else {
+            logger.error("Google Sign-In: Missing client ID")
+            throw AuthError.configurationError("Missing Google client ID")
+        }
+        
+        // For now, show a user-friendly message that Google Sign-In setup is in progress
+        // To fully implement, you need to:
+        // 1. Add GoogleSignIn SDK via SPM: https://github.com/google/GoogleSignIn-iOS
+        // 2. Add URL scheme for Google Sign-In in Info.plist
+        // 3. Implement the sign-in flow using GIDSignIn
+        
+        logger.info("Google Sign-In requested with client ID: \(clientID)")
         throw AuthError.notImplemented
     }
 
@@ -398,6 +415,7 @@ enum AuthError: LocalizedError {
     case invalidToken
     case noUser
     case notImplemented
+    case configurationError(String)
 
     var errorDescription: String? {
         switch self {
@@ -412,7 +430,9 @@ enum AuthError: LocalizedError {
         case .noUser:
             return "No user logged in"
         case .notImplemented:
-            return "This feature is not yet implemented"
+            return "Google Sign-In coming soon"
+        case .configurationError(let message):
+            return "Configuration error: \(message)"
         }
     }
 }
