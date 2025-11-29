@@ -19,9 +19,22 @@
 		CE09D5F42E9CB723002A856A /* Homi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Homi.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		CE68218C2EDAAA0400AA660C /* Exceptions for "Homi" folder in "Homi" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = CE09D5F32E9CB723002A856A /* Homi */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		CE09D5F62E9CB723002A856A /* Homi */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				CE68218C2EDAAA0400AA660C /* Exceptions for "Homi" folder in "Homi" target */,
+			);
 			path = Homi;
 			sourceTree = "<group>";
 		};
@@ -273,11 +286,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Homi/Homi.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 7WXW567MR7;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Homi/Info.plist;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Homi needs access to your camera to take profile pictures.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Homi needs your location to share it with your housemates so they can see where you are.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Homi needs access to your photo library to set your profile picture.";
@@ -309,11 +324,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Homi/Homi.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 7WXW567MR7;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Homi/Info.plist;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Homi needs access to your camera to take profile pictures.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Homi needs your location to share it with your housemates so they can see where you are.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Homi needs access to your photo library to set your profile picture.";

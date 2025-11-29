@@ -78,6 +78,7 @@ struct User: Codable, Identifiable {
 
     var toFirestore: [String: Any] {
         var data: [String: Any] = [
+            "id": id,
             "displayName": displayName,
             "authProviders": authProviders,
             "createdAt": Timestamp(date: createdAt),
