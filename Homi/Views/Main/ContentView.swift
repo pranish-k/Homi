@@ -91,7 +91,13 @@ struct AuthenticationView: View {
 struct MainTabView: View {
     @StateObject private var authService = AuthService.shared
     @StateObject private var firestoreService = FirestoreService.shared
+    @StateObject private var messagingService = MessagingService.shared
     @State private var selectedTab = 0
+
+    private var unreadMessagesCount: Int {
+        guard let userId = authService.user?.uid else { return 0 }
+        return messagingService.messages.filter { !$0.readBy.contains(userId) }.count
+    }
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -106,6 +112,7 @@ struct MainTabView: View {
                 .tabItem {
                     Label("Chat", systemImage: "message")
                 }
+                .badge(unreadMessagesCount > 0 ? "\(unreadMessagesCount)" : nil)
                 .tag(1)
 
             ExpensesView()
@@ -140,7 +147,7 @@ struct MainTabView: View {
     }
 }
 
-// Placeholder view for features coming in Phase 3
+// Placeholder view for features
 struct PlaceholderView: View {
     let title: String
     let icon: String

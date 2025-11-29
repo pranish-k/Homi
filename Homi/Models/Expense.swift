@@ -15,12 +15,12 @@ struct Expense: Identifiable, Codable, Equatable {
     let date: Date
     let paidBy: String
     let paidByName: String
-    let splits: [ExpenseSplit]
-    let isSettled: Bool
+    var splits: [ExpenseSplit]  // Changed to var to allow updates
+    var isSettled: Bool  // Changed to var to allow updates
     let createdAt: Date
     let createdBy: String
-    let lastModifiedAt: Date?  // Audit trail: when was this expense last modified
-    let lastModifiedBy: String? // Audit trail: who last modified this expense
+    var lastModifiedAt: Date?  // Changed to var - Audit trail: when was this expense last modified
+    var lastModifiedBy: String? // Changed to var - Audit trail: who last modified this expense
     let deletedAt: Date?       // Soft delete: when was this expense deleted
     let deletedBy: String?     // Soft delete: who deleted this expense
 
@@ -182,19 +182,40 @@ struct Expense: Identifiable, Codable, Equatable {
 
 // MARK: - Expense Split
 
-struct ExpenseSplit: Codable, Identifiable {
+struct ExpenseSplit: Codable, Identifiable, Equatable {
     var id: String { userId }
     let userId: String
     let userName: String
-    let amount: Double
+    let amount: Double  // ORIGINAL amount (never changes)
     var isPaid: Bool
+    var partialPayments: [PartialPaymentRecord]  // Payment history
+
+    init(userId: String, userName: String, amount: Double, isPaid: Bool, partialPayments: [PartialPaymentRecord] = []) {
+        self.userId = userId
+        self.userName = userName
+        self.amount = amount
+        self.isPaid = isPaid
+        self.partialPayments = partialPayments
+    }
+
+    // Computed property for remaining amount
+    var remainingAmount: Double {
+        let totalPaid = partialPayments.reduce(0) { $0 + $1.amount }
+        return max(0, amount - totalPaid)
+    }
+
+    // Check if fully paid
+    var isFullyPaid: Bool {
+        return remainingAmount <= 0.01  // Account for floating point
+    }
 
     var asDictionary: [String: Any] {
         return [
             "userId": userId,
             "userName": userName,
             "amount": amount,
-            "isPaid": isPaid
+            "isPaid": isPaid,
+            "partialPayments": partialPayments.map { $0.asDictionary }
         ]
     }
 
@@ -206,7 +227,10 @@ struct ExpenseSplit: Codable, Identifiable {
             return nil
         }
 
-        return ExpenseSplit(userId: userId, userName: userName, amount: amount, isPaid: isPaid)
+        let partialPaymentsData = data["partialPayments"] as? [[String: Any]] ?? []
+        let partialPayments = partialPaymentsData.compactMap { PartialPaymentRecord.fromFirestore($0) }
+
+        return ExpenseSplit(userId: userId, userName: userName, amount: amount, isPaid: isPaid, partialPayments: partialPayments)
     }
 
     var formattedAmount: String {
@@ -215,6 +239,50 @@ struct ExpenseSplit: Codable, Identifiable {
 
     func formattedAmount(currency: String) -> String {
         return CurrencyFormatter.format(amount: amount, currencyCode: currency)
+    }
+
+    var formattedRemainingAmount: String {
+        return String(format: "$%.2f", remainingAmount)
+    }
+}
+
+// MARK: - Partial Payment Record
+
+struct PartialPaymentRecord: Codable, Equatable, Identifiable {
+    var id: String { paymentId }
+    let paymentId: String
+    let amount: Double
+    let timestamp: Date
+    let paymentMethod: PaymentMethod?
+
+    var asDictionary: [String: Any] {
+        var dict: [String: Any] = [
+            "paymentId": paymentId,
+            "amount": amount,
+            "timestamp": Timestamp(date: timestamp)
+        ]
+        if let method = paymentMethod {
+            dict["paymentMethod"] = method.rawValue
+        }
+        return dict
+    }
+
+    static func fromFirestore(_ data: [String: Any]) -> PartialPaymentRecord? {
+        guard let paymentId = data["paymentId"] as? String,
+              let amount = data["amount"] as? Double,
+              let timestampValue = data["timestamp"] as? Timestamp else {
+            return nil
+        }
+
+        let paymentMethodStr = data["paymentMethod"] as? String
+        let paymentMethod = paymentMethodStr != nil ? PaymentMethod(rawValue: paymentMethodStr!) : nil
+
+        return PartialPaymentRecord(
+            paymentId: paymentId,
+            amount: amount,
+            timestamp: timestampValue.dateValue(),
+            paymentMethod: paymentMethod
+        )
     }
 }
 
@@ -259,8 +327,10 @@ enum ExpenseCategory: String, Codable, CaseIterable {
 
 // MARK: - Payment Model
 
-struct Payment: Identifiable, Codable {
+struct Payment: Identifiable, Codable, Equatable {
     let id: String
+    let transactionId: String // Unique transaction identifier
+    let idempotencyKey: String // For deduplication
     let houseId: String
     let fromUserId: String
     let fromUserName: String
@@ -268,10 +338,16 @@ struct Payment: Identifiable, Codable {
     let toUserName: String
     let amount: Double
     let expenseIds: [String]
+    let settledSplits: [SettledSplitInfo]  // Detailed split settlement info
     let note: String?
     let timestamp: Date
+    let status: PaymentStatus  // Payment status
+    let confirmedBy: String?  // Payee confirmation
+    let confirmedAt: Date?  // Confirmation timestamp
+    let paymentMethod: PaymentMethod  // How the payment was made
+    let externalTransactionId: String?  // Venmo/Zelle transaction ID
 
-    init(id: String = UUID().uuidString,
+    init(id: String? = nil,
          houseId: String,
          fromUserId: String,
          fromUserName: String,
@@ -279,9 +355,26 @@ struct Payment: Identifiable, Codable {
          toUserName: String,
          amount: Double,
          expenseIds: [String] = [],
+         settledSplits: [SettledSplitInfo] = [],
          note: String? = nil,
-         timestamp: Date = Date()) {
-        self.id = id
+         timestamp: Date = Date(),
+         status: PaymentStatus = .autoConfirmed,
+         confirmedBy: String? = nil,
+         confirmedAt: Date? = nil,
+         paymentMethod: PaymentMethod = .other,
+         externalTransactionId: String? = nil) {
+        // Generate deterministic ID to prevent duplicates using SORTED user IDs
+        let sortedUsers = [fromUserId, toUserId].sorted()
+        let timestampInt = Int(timestamp.timeIntervalSince1970 * 1000)  // milliseconds for uniqueness
+        let amountCents = Int(amount * 100)
+        self.id = id ?? "\(sortedUsers[0])_\(sortedUsers[1])_\(timestampInt)_\(amountCents)"
+
+        // Unique transaction ID for this specific payment attempt
+        self.transactionId = UUID().uuidString
+
+        // Idempotency key with 10-second window for duplicate detection (SORTED user IDs)
+        self.idempotencyKey = "\(sortedUsers[0])_\(sortedUsers[1])_\(amountCents)_\(timestampInt / 10000)"
+
         self.houseId = houseId
         self.fromUserId = fromUserId
         self.fromUserName = fromUserName
@@ -289,13 +382,21 @@ struct Payment: Identifiable, Codable {
         self.toUserName = toUserName
         self.amount = amount
         self.expenseIds = expenseIds
+        self.settledSplits = settledSplits
         self.note = note
         self.timestamp = timestamp
+        self.status = status
+        self.confirmedBy = confirmedBy
+        self.confirmedAt = confirmedAt
+        self.paymentMethod = paymentMethod
+        self.externalTransactionId = externalTransactionId
     }
 
     var asDictionary: [String: Any] {
         var dict: [String: Any] = [
             "id": id,
+            "transactionId": transactionId,
+            "idempotencyKey": idempotencyKey,
             "houseId": houseId,
             "fromUserId": fromUserId,
             "fromUserName": fromUserName,
@@ -303,19 +404,30 @@ struct Payment: Identifiable, Codable {
             "toUserName": toUserName,
             "amount": amount,
             "expenseIds": expenseIds,
-            "timestamp": Timestamp(date: timestamp)
+            "settledSplits": settledSplits.map { $0.asDictionary },
+            "timestamp": Timestamp(date: timestamp),
+            "status": status.rawValue,
+            "paymentMethod": paymentMethod.rawValue
         ]
 
         if let note = note {
             dict["note"] = note
+        }
+        if let confirmedBy = confirmedBy {
+            dict["confirmedBy"] = confirmedBy
+        }
+        if let confirmedAt = confirmedAt {
+            dict["confirmedAt"] = Timestamp(date: confirmedAt)
+        }
+        if let externalTransactionId = externalTransactionId {
+            dict["externalTransactionId"] = externalTransactionId
         }
 
         return dict
     }
 
     static func fromFirestore(_ data: [String: Any]) -> Payment? {
-        guard let id = data["id"] as? String,
-              let houseId = data["houseId"] as? String,
+        guard let houseId = data["houseId"] as? String,
               let fromUserId = data["fromUserId"] as? String,
               let fromUserName = data["fromUserName"] as? String,
               let toUserId = data["toUserId"] as? String,
@@ -327,6 +439,21 @@ struct Payment: Identifiable, Codable {
         }
 
         let note = data["note"] as? String
+        let id = data["id"] as? String
+
+        // Parse new fields with defaults for backward compatibility
+        let statusStr = data["status"] as? String ?? "auto_confirmed"
+        let status = PaymentStatus(rawValue: statusStr) ?? .autoConfirmed
+
+        let methodStr = data["paymentMethod"] as? String ?? "other"
+        let paymentMethod = PaymentMethod(rawValue: methodStr) ?? .other
+
+        let confirmedBy = data["confirmedBy"] as? String
+        let confirmedAt = (data["confirmedAt"] as? Timestamp)?.dateValue()
+        let externalTransactionId = data["externalTransactionId"] as? String
+
+        let settledSplitsData = data["settledSplits"] as? [[String: Any]] ?? []
+        let settledSplits = settledSplitsData.compactMap { SettledSplitInfo.fromFirestore($0) }
 
         return Payment(
             id: id,
@@ -337,8 +464,14 @@ struct Payment: Identifiable, Codable {
             toUserName: toUserName,
             amount: amount,
             expenseIds: expenseIds,
+            settledSplits: settledSplits,
             note: note,
-            timestamp: timestampValue.dateValue()
+            timestamp: timestampValue.dateValue(),
+            status: status,
+            confirmedBy: confirmedBy,
+            confirmedAt: confirmedAt,
+            paymentMethod: paymentMethod,
+            externalTransactionId: externalTransactionId
         )
     }
 
@@ -357,14 +490,110 @@ struct Payment: Identifiable, Codable {
     }
 }
 
+// MARK: - Payment Status
+
+enum PaymentStatus: String, Codable {
+    case pending = "pending"           // Just recorded, awaiting confirmation
+    case confirmed = "confirmed"       // Payee confirmed receipt
+    case disputed = "disputed"         // Issue reported
+    case autoConfirmed = "auto_confirmed"  // Auto-confirmed or no confirmation required
+}
+
+// MARK: - Payment Method
+
+enum PaymentMethod: String, Codable, CaseIterable {
+    case cash = "cash"
+    case venmo = "venmo"
+    case zelle = "zelle"
+    case cashApp = "cash_app"
+    case bankTransfer = "bank_transfer"
+    case check = "check"
+    case other = "other"
+
+    var displayName: String {
+        switch self {
+        case .cash: return "Cash"
+        case .venmo: return "Venmo"
+        case .zelle: return "Zelle"
+        case .cashApp: return "Cash App"
+        case .bankTransfer: return "Bank Transfer"
+        case .check: return "Check"
+        case .other: return "Other"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .cash: return "dollarsign.circle.fill"
+        case .venmo: return "v.circle.fill"
+        case .zelle: return "z.circle.fill"
+        case .cashApp: return "dollarsign.square.fill"
+        case .bankTransfer: return "building.columns.fill"
+        case .check: return "doc.text.fill"
+        case .other: return "creditcard.fill"
+        }
+    }
+
+    var supportsExternalId: Bool {
+        return [.venmo, .zelle, .cashApp, .bankTransfer].contains(self)
+    }
+}
+
+// MARK: - Settled Split Info
+
+struct SettledSplitInfo: Codable, Equatable, Identifiable {
+    var id: String { expenseId + splitUserId }
+    let expenseId: String
+    let expenseDescription: String
+    let splitUserId: String  // Which user's split was settled
+    let originalSplitAmount: Double  // Track original amount
+    let amountSettled: Double
+    let remainingAfterPayment: Double  // What's left after this payment
+    let wasPartialPayment: Bool
+
+    var asDictionary: [String: Any] {
+        return [
+            "expenseId": expenseId,
+            "expenseDescription": expenseDescription,
+            "splitUserId": splitUserId,
+            "originalSplitAmount": originalSplitAmount,
+            "amountSettled": amountSettled,
+            "remainingAfterPayment": remainingAfterPayment,
+            "wasPartialPayment": wasPartialPayment
+        ]
+    }
+
+    static func fromFirestore(_ data: [String: Any]) -> SettledSplitInfo? {
+        guard let expenseId = data["expenseId"] as? String,
+              let expenseDescription = data["expenseDescription"] as? String,
+              let splitUserId = data["splitUserId"] as? String,
+              let originalSplitAmount = data["originalSplitAmount"] as? Double,
+              let amountSettled = data["amountSettled"] as? Double,
+              let remainingAfterPayment = data["remainingAfterPayment"] as? Double,
+              let wasPartialPayment = data["wasPartialPayment"] as? Bool else {
+            return nil
+        }
+
+        return SettledSplitInfo(
+            expenseId: expenseId,
+            expenseDescription: expenseDescription,
+            splitUserId: splitUserId,
+            originalSplitAmount: originalSplitAmount,
+            amountSettled: amountSettled,
+            remainingAfterPayment: remainingAfterPayment,
+            wasPartialPayment: wasPartialPayment
+        )
+    }
+}
+
 // MARK: - Balance Summary
 
 struct Balance: Identifiable {
     var id: String { userId }
     let userId: String
     let userName: String
-    var owedToYou: Double  // Money they owe you
-    var youOwe: Double     // Money you owe them
+    var owedToYou: Double  // Money they owe you (GROSS)
+    var youOwe: Double     // Money you owe them (GROSS)
 
     var netBalance: Double {
         return owedToYou - youOwe
@@ -388,6 +617,28 @@ struct Balance: Identifiable {
         } else {
             return "settled up"
         }
+    }
+}
+
+// MARK: - Balance Detail (NET vs GROSS)
+
+struct BalanceDetail {
+    let netBalance: Double          // +$10 (you're owed) or -$10 (you owe)
+    let grossOwed: Double           // $50 - what you owe them
+    let grossOwedToYou: Double      // $40 - what they owe you
+    let unpaidExpensesYouOwe: [Expense]        // Expenses where you owe them
+    let unpaidExpensesTheyOweYou: [Expense]    // Expenses where they owe you
+
+    var formattedNetBalance: String {
+        return String(format: "$%.2f", abs(netBalance))
+    }
+
+    var formattedGrossOwed: String {
+        return String(format: "$%.2f", grossOwed)
+    }
+
+    var formattedGrossOwedToYou: String {
+        return String(format: "$%.2f", grossOwedToYou)
     }
 }
 

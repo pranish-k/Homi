@@ -6,6 +6,7 @@ struct AddChoreView: View {
     let houseMembers: [HouseMember]
 
     @State private var showingDatePicker = false
+    @State private var includeTime = false
 
     var body: some View {
         NavigationStack {
@@ -56,8 +57,15 @@ struct AddChoreView: View {
 
                             Spacer()
 
-                            Text(viewModel.selectedDate, style: .date)
-                                .foregroundColor(Constants.Colors.textSecondary)
+                            if includeTime {
+                                Text(viewModel.selectedDate, style: .date)
+                                    .foregroundColor(Constants.Colors.textSecondary)
+                                Text(viewModel.selectedDate, style: .time)
+                                    .foregroundColor(Constants.Colors.textSecondary)
+                            } else {
+                                Text(viewModel.selectedDate, style: .date)
+                                    .foregroundColor(Constants.Colors.textSecondary)
+                            }
                         }
                     }
 
@@ -65,10 +73,14 @@ struct AddChoreView: View {
                         DatePicker(
                             "Select Date",
                             selection: $viewModel.selectedDate,
-                            displayedComponents: [.date]
+                            displayedComponents: includeTime ? [.date, .hourAndMinute] : [.date]
                         )
                         .datePickerStyle(.graphical)
                     }
+
+                    // Include Time Toggle
+                    Toggle("Include Time", isOn: $includeTime)
+                        .tint(Constants.Colors.primary)
 
                     // Frequency
                     Picker("Frequency", selection: $viewModel.selectedFrequency) {

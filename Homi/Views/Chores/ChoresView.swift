@@ -8,6 +8,8 @@ struct ChoresView: View {
     @State private var showingAddChore = false
     @State private var selectedFilter: ChoreFilter = .all
     @State private var houseMembers: [HouseMember] = []
+    @State private var selectedCompletedByUserId: String? = nil // nil = all
+    @State private var showingCompletedFilter = false
 
     private let logger = Logger(subsystem: "com.homi.app", category: "ChoresView")
 
@@ -19,15 +21,18 @@ struct ChoresView: View {
         switch selectedFilter {
         case .all:
             return viewModel.getActiveChores()
-        case .myChores:
+        case .mine:
             guard let userId = currentUserId else { return [] }
             return viewModel.getChoresByAssignee(userId: userId)
-        case .dueToday:
-            return viewModel.getDueTodayChores()
         case .overdue:
             return viewModel.getOverdueChoresSync()
         case .completed:
-            return viewModel.getCompletedChores()
+            let completedChores = viewModel.getCompletedChores()
+            // Apply completed by filter if set
+            if let filterId = selectedCompletedByUserId {
+                return completedChores.filter { $0.completedBy == filterId }
+            }
+            return completedChores
         }
     }
 
@@ -90,33 +95,113 @@ struct ChoresView: View {
     // MARK: - Views
 
     private var choresListView: some View {
-        ScrollView {
-            LazyVStack(spacing: Constants.Spacing.medium) {
-                ForEach(filteredChores) { chore in
-                    ChoreCardView(
-                        chore: chore,
-                        currentUserId: currentUserId ?? "",
-                        onComplete: {
-                            Task {
-                                await viewModel.markComplete(chore)
-                            }
-                        },
-                        onUncomplete: {
-                            Task {
-                                await viewModel.markIncomplete(chore)
-                            }
-                        },
-                        onDelete: {
-                            Task {
-                                await viewModel.deleteChore(chore)
+        VStack(spacing: 0) {
+            // Show filter button only on Completed tab
+            if selectedFilter == .completed {
+                HStack {
+                    Menu {
+                        Button(action: {
+                            selectedCompletedByUserId = nil
+                        }) {
+                            HStack {
+                                Text("All Members")
+                                Spacer()
+                                if selectedCompletedByUserId == nil {
+                                    Image(systemName: "checkmark")
+                                }
                             }
                         }
-                    )
+
+                        Divider()
+
+                        ForEach(houseMembers) { member in
+                            Button(action: {
+                                selectedCompletedByUserId = member.userId
+                            }) {
+                                HStack {
+                                    Text(member.displayName)
+                                    Spacer()
+                                    if selectedCompletedByUserId == member.userId {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: Constants.Spacing.xSmall) {
+                            Text("Filter")
+                                .font(Constants.Typography.bodyMedium)
+                                .foregroundColor(Constants.Colors.primary)
+
+                            if let selectedUserId = selectedCompletedByUserId,
+                               let member = houseMembers.first(where: { $0.userId == selectedUserId }) {
+                                Text("• \(member.displayName)")
+                                    .font(Constants.Typography.body)
+                                    .foregroundColor(Constants.Colors.textSecondary)
+                            }
+
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 12))
+                                .foregroundColor(Constants.Colors.primary)
+                        }
+                        .padding(.horizontal, Constants.Spacing.medium)
+                        .padding(.vertical, Constants.Spacing.small)
+                    }
+
+                    Spacer()
                 }
+                .padding(.horizontal, Constants.Spacing.medium)
+                .padding(.top, Constants.Spacing.small)
+                .background(Color(.systemGroupedBackground))
             }
-            .padding(Constants.Spacing.medium)
+
+            ScrollView {
+                LazyVStack(spacing: selectedFilter == .completed ? Constants.Spacing.small : Constants.Spacing.medium) {
+                    ForEach(filteredChores) { chore in
+                        if selectedFilter == .completed {
+                            // Use compact card for completed chores
+                            CompactChoreCardView(
+                                chore: chore,
+                                currentUserId: currentUserId ?? "",
+                                onUncomplete: {
+                                    Task {
+                                        await viewModel.markIncomplete(chore)
+                                    }
+                                },
+                                onDelete: {
+                                    Task {
+                                        await viewModel.deleteChore(chore)
+                                    }
+                                }
+                            )
+                        } else {
+                            // Use regular card for active chores
+                            ChoreCardView(
+                                chore: chore,
+                                currentUserId: currentUserId ?? "",
+                                onComplete: {
+                                    Task {
+                                        await viewModel.markComplete(chore)
+                                    }
+                                },
+                                onUncomplete: {
+                                    Task {
+                                        await viewModel.markIncomplete(chore)
+                                    }
+                                },
+                                onDelete: {
+                                    Task {
+                                        await viewModel.deleteChore(chore)
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+                .padding(Constants.Spacing.medium)
+            }
+            .background(Color(.systemGroupedBackground))
         }
-        .background(Color(.systemGroupedBackground))
     }
 
     private var emptyStateView: some View {
@@ -192,8 +277,7 @@ struct ChoresView: View {
     private var emptyStateIcon: String {
         switch selectedFilter {
         case .all: return "checkmark.circle"
-        case .myChores: return "person.circle"
-        case .dueToday: return "calendar.circle"
+        case .mine: return "person.circle"
         case .overdue: return "exclamationmark.triangle"
         case .completed: return "checkmark.seal"
         }
@@ -202,8 +286,7 @@ struct ChoresView: View {
     private var emptyStateTitle: String {
         switch selectedFilter {
         case .all: return "No Active Chores"
-        case .myChores: return "No Chores Assigned to You"
-        case .dueToday: return "Nothing Due Today"
+        case .mine: return "No Chores Assigned to You"
         case .overdue: return "No Overdue Chores"
         case .completed: return "No Completed Chores"
         }
@@ -212,8 +295,7 @@ struct ChoresView: View {
     private var emptyStateMessage: String {
         switch selectedFilter {
         case .all: return "Create a chore to get started with household task management"
-        case .myChores: return "You don't have any chores assigned to you right now"
-        case .dueToday: return "Great! You don't have any chores due today"
+        case .mine: return "You don't have any chores assigned to you right now"
         case .overdue: return "Awesome! All chores are up to date"
         case .completed: return "Complete some chores to see them here"
         }
@@ -238,10 +320,9 @@ struct ChoresView: View {
 
 enum ChoreFilter: String, CaseIterable {
     case all = "All"
-    case myChores = "Mine"
-    case dueToday = "Today"
+    case mine = "Mine"
     case overdue = "Overdue"
-    case completed = "Done"
+    case completed = "Completed"
 }
 
 // MARK: - Preview

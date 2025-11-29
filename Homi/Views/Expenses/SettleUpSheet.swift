@@ -12,46 +12,114 @@ struct SettleUpSheet: View {
     let houseId: String
     var onPaymentRecorded: () -> Void
 
-    @State private var showRecordPayment = false
+    // State
+    @State private var balanceDetail: BalanceDetail?
+    @State private var isLoadingDetail = true
+    @State private var showExpenseSelection = false
+    @State private var selectedExpenses: Set<String> = []
     @State private var paymentAmount: String = ""
+    @State private var selectedPaymentMethod: PaymentMethod = .cash
+    @State private var externalTransactionId: String = ""
+    @State private var note: String = ""
     @State private var isProcessing = false
     @State private var errorMessage: String?
     @State private var showError = false
+    @State private var showBreakdown = false
 
-    private var maxAmount: Double {
-        abs(balance.netBalance)
+    private var currentUserId: String {
+        authService.user?.uid ?? ""
     }
 
-    private var formattedMaxAmount: String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = "USD"
-        return formatter.string(from: NSNumber(value: maxAmount)) ?? "$0.00"
+    private var currentUserName: String {
+        authService.userProfile?.displayName ?? ""
+    }
+
+    // Calculate NET balance amount
+    private var netBalanceAmount: Double {
+        abs(balanceDetail?.netBalance ?? balance.netBalance)
+    }
+
+    // Determine if user owes or is owed
+    private var userOwes: Bool {
+        (balanceDetail?.netBalance ?? balance.netBalance) < 0
+    }
+
+    // Calculate selected expenses total
+    private var selectedExpensesTotal: Double {
+        guard let detail = balanceDetail else { return 0 }
+        var total: Double = 0
+
+        for expenseId in selectedExpenses {
+            if let expense = (detail.unpaidExpensesYouOwe + detail.unpaidExpensesTheyOweYou)
+                .first(where: { $0.id == expenseId }) {
+                // Find the split amount for current user or other user
+                if let split = expense.splits.first(where: { $0.userId == currentUserId }) {
+                    total += split.remainingAmount
+                } else if let split = expense.splits.first(where: { $0.userId == balance.userId }) {
+                    total += split.remainingAmount
+                }
+            }
+        }
+        return total
+    }
+
+    private var paymentAmountValue: Double {
+        Double(paymentAmount) ?? 0
+    }
+
+    private var isValidAmount: Bool {
+        guard let amount = Double(paymentAmount) else { return false }
+        return amount > 0 && amount <= netBalanceAmount + 0.01  // Small tolerance
     }
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: Constants.Spacing.large) {
-                if !showRecordPayment {
-                    paymentOptionsView
-                } else {
-                    recordPaymentView
+            ScrollView {
+                VStack(spacing: Constants.Spacing.large) {
+                    if isLoadingDetail {
+                        ProgressView("Loading balance details...")
+                            .padding()
+                    } else if let detail = balanceDetail {
+                        netBalanceSection(detail: detail)
+
+                        Divider()
+
+                        if !showExpenseSelection {
+                            quickActionsSection
+                        } else {
+                            expenseSelectionSection(detail: detail)
+
+                            Divider()
+
+                            paymentMethodSection
+
+                            Divider()
+
+                            amountInputSection
+
+                            recordPaymentButton
+                        }
+                    }
                 }
+                .padding(Constants.Spacing.large)
             }
-            .padding(Constants.Spacing.large)
             .navigationTitle("Settle Balance")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Cancel") {
-                        if showRecordPayment {
-                            showRecordPayment = false
+                        if showExpenseSelection {
+                            showExpenseSelection = false
+                            selectedExpenses.removeAll()
                         } else {
                             dismiss()
                         }
                     }
                     .foregroundColor(Constants.Colors.primary)
                 }
+            }
+            .task {
+                await loadBalanceDetail()
             }
             .alert("Error", isPresented: $showError) {
                 Button("OK") { }
@@ -63,155 +131,360 @@ struct SettleUpSheet: View {
         }
     }
 
-    // MARK: - Payment Options View
+    // MARK: - NET Balance Section
 
-    private var paymentOptionsView: some View {
+    private func netBalanceSection(detail: BalanceDetail) -> some View {
         VStack(spacing: Constants.Spacing.medium) {
-            // Balance Info
-            VStack(spacing: Constants.Spacing.small) {
-                Text(balance.userName)
-                    .font(Constants.Typography.title2)
-                    .foregroundColor(Constants.Colors.textPrimary)
+            // User name
+            Text(balance.userName)
+                .font(Constants.Typography.title2)
+                .foregroundColor(Constants.Colors.textPrimary)
 
-                Text(formattedMaxAmount)
-                    .font(.system(size: 40, weight: .bold, design: .rounded))
-                    .foregroundColor(balance.netBalance > 0 ? Constants.Colors.success : Constants.Colors.danger)
+            // NET Balance label
+            Text("NET Balance")
+                .font(Constants.Typography.caption1)
+                .foregroundColor(Constants.Colors.textSecondary)
 
-                Text(balance.netBalance > 0 ? "owes you" : "you owe")
-                    .font(Constants.Typography.body)
-                    .foregroundColor(Constants.Colors.textSecondary)
+            // Amount
+            Text("$\(netBalanceAmount, specifier: "%.2f")")
+                .font(.system(size: 48, weight: .bold, design: .rounded))
+                .foregroundColor(userOwes ? Constants.Colors.danger : Constants.Colors.success)
+
+            // Description
+            Text(userOwes ? "You Owe" : "Owes You")
+                .font(Constants.Typography.headline)
+                .foregroundColor(Constants.Colors.textSecondary)
+
+            // Breakdown toggle
+            Button(action: { showBreakdown.toggle() }) {
+                HStack {
+                    Text(showBreakdown ? "Hide Breakdown" : "View Breakdown")
+                        .font(Constants.Typography.caption1)
+                    Image(systemName: showBreakdown ? "chevron.up" : "chevron.down")
+                        .font(.caption)
+                }
+                .foregroundColor(Constants.Colors.primary)
             }
-            .padding(.bottom, Constants.Spacing.large)
+            .padding(.top, Constants.Spacing.small)
 
-            Divider()
-
-            // Payment Options
-            VStack(spacing: Constants.Spacing.medium) {
-                Text("How would you like to settle?")
-                    .font(Constants.Typography.headline)
-                    .foregroundColor(Constants.Colors.textPrimary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                // Venmo (placeholder)
-                PaymentOptionButton(
-                    icon: "dollarsign.circle.fill",
-                    title: "Pay on Venmo",
-                    subtitle: "Coming soon",
-                    action: {
-                        // Placeholder for Venmo integration
+            // Breakdown detail
+            if showBreakdown {
+                VStack(spacing: Constants.Spacing.small) {
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text("They owe you:")
+                                .font(Constants.Typography.caption1)
+                                .foregroundColor(Constants.Colors.textSecondary)
+                            Text("$\(detail.grossOwedToYou, specifier: "%.2f")")
+                                .font(Constants.Typography.headline)
+                                .foregroundColor(Constants.Colors.success)
+                        }
+                        Spacer()
+                        VStack(alignment: .trailing) {
+                            Text("You owe them:")
+                                .font(Constants.Typography.caption1)
+                                .foregroundColor(Constants.Colors.textSecondary)
+                            Text("$\(detail.grossOwed, specifier: "%.2f")")
+                                .font(Constants.Typography.headline)
+                                .foregroundColor(Constants.Colors.danger)
+                        }
                     }
-                )
-                .disabled(true)
-                .opacity(0.5)
-
-                // PayPal (placeholder)
-                PaymentOptionButton(
-                    icon: "dollarsign.circle.fill",
-                    title: "Pay on PayPal",
-                    subtitle: "Coming soon",
-                    action: {
-                        // Placeholder for PayPal integration
-                    }
-                )
-                .disabled(true)
-                .opacity(0.5)
-
-                // Record Payment
-                PaymentOptionButton(
-                    icon: "checkmark.circle.fill",
-                    title: "Record Completed Payment",
-                    subtitle: "Already paid outside the app",
-                    action: {
-                        paymentAmount = String(format: "%.2f", maxAmount)
-                        showRecordPayment = true
-                    }
-                )
+                    .padding()
+                    .background(Constants.Colors.secondaryBackground)
+                    .cornerRadius(Constants.CornerRadius.medium)
+                }
             }
-
-            Spacer()
         }
     }
 
-    // MARK: - Record Payment View
+    // MARK: - Quick Actions Section
 
-    private var recordPaymentView: some View {
-        VStack(spacing: Constants.Spacing.large) {
-            // Balance Info
-            VStack(spacing: Constants.Spacing.small) {
-                Text("Record Payment")
-                    .font(Constants.Typography.title2)
-                    .foregroundColor(Constants.Colors.textPrimary)
+    private var quickActionsSection: some View {
+        VStack(spacing: Constants.Spacing.medium) {
+            Text("How would you like to settle?")
+                .font(Constants.Typography.headline)
+                .foregroundColor(Constants.Colors.textPrimary)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-                Text("Maximum: \(formattedMaxAmount)")
-                    .font(Constants.Typography.body)
-                    .foregroundColor(Constants.Colors.textSecondary)
+            // Settle Full Balance
+            Button(action: {
+                settleFullBalance()
+            }) {
+                HStack {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(Constants.Colors.success)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Settle Full Balance")
+                            .font(Constants.Typography.headline)
+                            .foregroundColor(Constants.Colors.textPrimary)
+
+                        Text("Pay $\(netBalanceAmount, specifier: "%.2f") using smart offset")
+                            .font(Constants.Typography.caption1)
+                            .foregroundColor(Constants.Colors.textSecondary)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(Constants.Colors.textSecondary)
+                }
+                .padding(Constants.Spacing.cardPadding)
+                .background(Constants.Colors.secondaryBackground)
+                .cornerRadius(Constants.CornerRadius.medium)
             }
 
-            Divider()
-
-            // Amount Input
-            VStack(alignment: .leading, spacing: Constants.Spacing.small) {
-                Text("Payment Amount")
-                    .font(Constants.Typography.headline)
-                    .foregroundColor(Constants.Colors.textPrimary)
-
+            // Select Specific Expenses
+            Button(action: {
+                showExpenseSelection = true
+            }) {
                 HStack {
-                    Text("$")
-                        .font(Constants.Typography.title2)
-                        .foregroundColor(Constants.Colors.textPrimary)
+                    Image(systemName: "list.bullet.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(Constants.Colors.primary)
 
-                    TextField("0.00", text: $paymentAmount)
-                        .font(Constants.Typography.title2)
-                        .keyboardType(.decimalPad)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Select Specific Expenses")
+                            .font(Constants.Typography.headline)
+                            .foregroundColor(Constants.Colors.textPrimary)
+
+                        Text("Choose which expenses to settle")
+                            .font(Constants.Typography.caption1)
+                            .foregroundColor(Constants.Colors.textSecondary)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(Constants.Colors.textSecondary)
+                }
+                .padding(Constants.Spacing.cardPadding)
+                .background(Constants.Colors.secondaryBackground)
+                .cornerRadius(Constants.CornerRadius.medium)
+            }
+        }
+    }
+
+    // MARK: - Expense Selection Section
+
+    private func expenseSelectionSection(detail: BalanceDetail) -> some View {
+        VStack(alignment: .leading, spacing: Constants.Spacing.medium) {
+            Text("Select Expenses")
+                .font(Constants.Typography.headline)
+                .foregroundColor(Constants.Colors.textPrimary)
+
+            // Your unpaid expenses (you owe them)
+            if !detail.unpaidExpensesYouOwe.isEmpty {
+                Text("Your Unpaid Expenses to \(balance.userName)")
+                    .font(Constants.Typography.subheadline)
+                    .foregroundColor(Constants.Colors.textSecondary)
+
+                ForEach(detail.unpaidExpensesYouOwe) { expense in
+                    ExpenseCheckboxRow(
+                        expense: expense,
+                        userId: currentUserId,
+                        isSelected: selectedExpenses.contains(expense.id),
+                        onToggle: { toggleExpense(expense.id) }
+                    )
+                }
+            }
+
+            // Their unpaid expenses (they owe you) - can offset
+            if !detail.unpaidExpensesTheyOweYou.isEmpty {
+                Text("\(balance.userName)'s Unpaid Expenses to You (Can Offset)")
+                    .font(Constants.Typography.subheadline)
+                    .foregroundColor(Constants.Colors.textSecondary)
+                    .padding(.top, Constants.Spacing.small)
+
+                ForEach(detail.unpaidExpensesTheyOweYou) { expense in
+                    ExpenseCheckboxRow(
+                        expense: expense,
+                        userId: balance.userId,
+                        isSelected: selectedExpenses.contains(expense.id),
+                        onToggle: { toggleExpense(expense.id) }
+                    )
+                }
+            }
+
+            // Selected total
+            if !selectedExpenses.isEmpty {
+                HStack {
+                    Text("Total Selected:")
+                        .font(Constants.Typography.headline)
+                    Spacer()
+                    Text("$\(selectedExpensesTotal, specifier: "%.2f")")
+                        .font(Constants.Typography.headline)
+                        .foregroundColor(Constants.Colors.primary)
+                }
+                .padding()
+                .background(Constants.Colors.secondaryBackground)
+                .cornerRadius(Constants.CornerRadius.medium)
+            }
+        }
+    }
+
+    // MARK: - Payment Method Section
+
+    private var paymentMethodSection: some View {
+        VStack(alignment: .leading, spacing: Constants.Spacing.medium) {
+            Text("Payment Method")
+                .font(Constants.Typography.headline)
+                .foregroundColor(Constants.Colors.textPrimary)
+
+            LazyVGrid(columns: [
+                GridItem(.flexible()),
+                GridItem(.flexible()),
+                GridItem(.flexible())
+            ], spacing: Constants.Spacing.small) {
+                ForEach(PaymentMethod.allCases, id: \.self) { method in
+                    PaymentMethodButton(
+                        method: method,
+                        isSelected: selectedPaymentMethod == method,
+                        action: { selectedPaymentMethod = method }
+                    )
+                }
+            }
+
+            // External transaction ID (if applicable)
+            if selectedPaymentMethod.supportsExternalId {
+                VStack(alignment: .leading, spacing: Constants.Spacing.small) {
+                    Text("Transaction ID (Optional)")
+                        .font(Constants.Typography.caption1)
+                        .foregroundColor(Constants.Colors.textSecondary)
+
+                    TextField("Enter transaction ID", text: $externalTransactionId)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                 }
             }
-            .padding(.vertical, Constants.Spacing.medium)
-
-            // Record Button
-            Button(action: {
-                Task {
-                    await recordPayment()
-                }
-            }) {
-                HStack {
-                    if isProcessing {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    } else {
-                        Text("Record Payment")
-                            .font(Constants.Typography.headline)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(isValidAmount ? Constants.Colors.primary : Color.gray.opacity(0.3))
-                .foregroundColor(.white)
-                .cornerRadius(Constants.CornerRadius.medium)
-            }
-            .disabled(!isValidAmount || isProcessing)
-
-            Spacer()
         }
     }
 
-    // MARK: - Validation
+    // MARK: - Amount Input Section
 
-    private var isValidAmount: Bool {
-        guard let amount = Double(paymentAmount) else { return false }
-        return amount > 0 && amount <= maxAmount
+    private var amountInputSection: some View {
+        VStack(alignment: .leading, spacing: Constants.Spacing.small) {
+            Text("Payment Amount")
+                .font(Constants.Typography.headline)
+                .foregroundColor(Constants.Colors.textPrimary)
+
+            HStack {
+                Text("$")
+                    .font(Constants.Typography.title2)
+                    .foregroundColor(Constants.Colors.textPrimary)
+
+                TextField("0.00", text: $paymentAmount)
+                    .font(Constants.Typography.title2)
+                    .keyboardType(.decimalPad)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+            }
+
+            Text("Maximum: $\(netBalanceAmount, specifier: "%.2f")")
+                .font(Constants.Typography.caption1)
+                .foregroundColor(Constants.Colors.textSecondary)
+
+            // Validation warning
+            if let warning = paymentWarning {
+                Text(warning)
+                    .font(Constants.Typography.caption1)
+                    .foregroundColor(Constants.Colors.warning)
+            }
+        }
+    }
+
+    private var paymentWarning: String? {
+        if paymentAmountValue > netBalanceAmount + 0.01 {
+            return "⚠️ Amount exceeds NET balance"
+        }
+        if !selectedExpenses.isEmpty && paymentAmountValue > selectedExpensesTotal + 0.01 {
+            return "⚠️ Amount exceeds selected expenses total"
+        }
+        return nil
+    }
+
+    // MARK: - Record Payment Button
+
+    private var recordPaymentButton: some View {
+        Button(action: {
+            Task {
+                await recordPayment()
+            }
+        }) {
+            HStack {
+                if isProcessing {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                } else {
+                    Text("Record Payment")
+                        .font(Constants.Typography.headline)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(isValidAmount && !selectedExpenses.isEmpty ? Constants.Colors.primary : Color.gray.opacity(0.3))
+            .foregroundColor(.white)
+            .cornerRadius(Constants.CornerRadius.medium)
+        }
+        .disabled(!isValidAmount || selectedExpenses.isEmpty || isProcessing)
     }
 
     // MARK: - Actions
 
+    private func loadBalanceDetail() async {
+        isLoadingDetail = true
+        do {
+            let detail = try await expenseService.getBalanceDetail(
+                forUser: currentUserId,
+                withUser: balance.userId,
+                inHouse: houseId
+            )
+            await MainActor.run {
+                self.balanceDetail = detail
+                self.isLoadingDetail = false
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage = "Failed to load balance details: \(error.localizedDescription)"
+                showError = true
+                isLoadingDetail = false
+            }
+        }
+    }
+
+    private func toggleExpense(_ expenseId: String) {
+        if selectedExpenses.contains(expenseId) {
+            selectedExpenses.remove(expenseId)
+        } else {
+            selectedExpenses.insert(expenseId)
+        }
+
+        // Auto-calculate total
+        paymentAmount = String(format: "%.2f", selectedExpensesTotal)
+    }
+
+    private func settleFullBalance() {
+        guard let detail = balanceDetail else { return }
+
+        // Use smart settlement to select expenses
+        let selectedIds = expenseService.calculateSmartSettlement(
+            paymentAmount: netBalanceAmount,
+            balanceDetail: detail,
+            payerId: currentUserId,
+            payeeId: balance.userId
+        )
+
+        selectedExpenses = Set(selectedIds)
+        paymentAmount = String(format: "%.2f", netBalanceAmount)
+        showExpenseSelection = true
+    }
+
     private func recordPayment() async {
         guard let amount = Double(paymentAmount),
               amount > 0,
-              amount <= maxAmount,
-              let currentUserId = authService.user?.uid,
-              let currentUserName = authService.userProfile?.displayName else {
+              !selectedExpenses.isEmpty,
+              let detail = balanceDetail else {
             await MainActor.run {
-                errorMessage = "Please enter a valid amount up to \(formattedMaxAmount)"
+                errorMessage = "Invalid payment details"
                 showError = true
             }
             return
@@ -221,39 +494,37 @@ struct SettleUpSheet: View {
             isProcessing = true
         }
 
+        // Determine payer and payee based on who owes
+        let (fromUserId, fromUserName, toUserId, toUserName): (String, String, String, String)
+
+        if userOwes {
+            // User owes balance
+            fromUserId = currentUserId
+            fromUserName = currentUserName
+            toUserId = balance.userId
+            toUserName = balance.userName
+        } else {
+            // Balance owes user
+            fromUserId = balance.userId
+            fromUserName = balance.userName
+            toUserId = currentUserId
+            toUserName = currentUserName
+        }
+
         do {
-            // Determine who is paying whom
-            let (fromUserId, fromUserName, toUserId, toUserName): (String, String, String, String)
-
-            if balance.netBalance > 0 {
-                // Balance owes you, so they are paying you
-                fromUserId = balance.userId
-                fromUserName = balance.userName
-                toUserId = currentUserId
-                toUserName = currentUserName
-            } else {
-                // You owe balance, so you are paying them
-                fromUserId = currentUserId
-                fromUserName = currentUserName
-                toUserId = balance.userId
-                toUserName = balance.userName
-            }
-
-            // Create payment with empty expense IDs
-            // The transaction will find and update the relevant expenses automatically
-            let payment = Payment(
-                houseId: houseId,
+            _ = try await expenseService.recordPaymentWithSettlement(
                 fromUserId: fromUserId,
                 fromUserName: fromUserName,
                 toUserId: toUserId,
                 toUserName: toUserName,
                 amount: amount,
-                expenseIds: [], // Empty - will be handled by transaction
-                note: nil,
-                timestamp: Date()
+                selectedExpenseIds: Array(selectedExpenses),
+                paymentMethod: selectedPaymentMethod,
+                externalTransactionId: externalTransactionId.isEmpty ? nil : externalTransactionId,
+                note: note.isEmpty ? nil : note,
+                houseId: houseId,
+                strategy: .smart
             )
-
-            try await ExpenseService.shared.recordPayment(payment: payment)
 
             await MainActor.run {
                 HapticManager.success()
@@ -261,10 +532,13 @@ struct SettleUpSheet: View {
                 onPaymentRecorded()
                 dismiss()
             }
+
+            print("✅ Payment recorded successfully")
+
         } catch {
             await MainActor.run {
                 HapticManager.error()
-                errorMessage = "Failed to record payment: \(error.localizedDescription)"
+                errorMessage = error.localizedDescription
                 showError = true
                 isProcessing = false
             }
@@ -272,41 +546,70 @@ struct SettleUpSheet: View {
     }
 }
 
-// MARK: - Payment Option Button
+// MARK: - Expense Checkbox Row
 
-struct PaymentOptionButton: View {
-    let icon: String
-    let title: String
-    let subtitle: String
-    let action: () -> Void
+struct ExpenseCheckboxRow: View {
+    let expense: Expense
+    let userId: String
+    let isSelected: Bool
+    let onToggle: () -> Void
+
+    private var splitAmount: Double {
+        expense.splits.first(where: { $0.userId == userId })?.remainingAmount ?? 0
+    }
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: Constants.Spacing.medium) {
-                Image(systemName: icon)
-                    .font(.system(size: 24))
-                    .foregroundColor(Constants.Colors.primary)
-                    .frame(width: 40, height: 40)
+        Button(action: onToggle) {
+            HStack {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .foregroundColor(isSelected ? Constants.Colors.success : Constants.Colors.textSecondary)
+                    .font(.system(size: 20))
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(Constants.Typography.headline)
+                    Text(expense.description)
+                        .font(Constants.Typography.subheadline)
                         .foregroundColor(Constants.Colors.textPrimary)
 
-                    Text(subtitle)
+                    Text(expense.shortDate)
                         .font(Constants.Typography.caption1)
                         .foregroundColor(Constants.Colors.textSecondary)
                 }
 
                 Spacer()
 
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14))
-                    .foregroundColor(Constants.Colors.textSecondary)
+                Text("$\(splitAmount, specifier: "%.2f")")
+                    .font(Constants.Typography.headline)
+                    .foregroundColor(Constants.Colors.textPrimary)
             }
-            .padding(Constants.Spacing.cardPadding)
-            .background(Constants.Colors.secondaryBackground)
-            .cornerRadius(Constants.CornerRadius.medium)
+            .padding(Constants.Spacing.small)
+            .background(isSelected ? Constants.Colors.success.opacity(0.1) : Constants.Colors.secondaryBackground)
+            .cornerRadius(Constants.CornerRadius.small)
+        }
+    }
+}
+
+// MARK: - Payment Method Button
+
+struct PaymentMethodButton: View {
+    let method: PaymentMethod
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 8) {
+                Image(systemName: method.icon)
+                    .font(.system(size: 24))
+                    .foregroundColor(isSelected ? .white : Constants.Colors.primary)
+
+                Text(method.displayName)
+                    .font(Constants.Typography.caption1)
+                    .foregroundColor(isSelected ? .white : Constants.Colors.textPrimary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(isSelected ? Constants.Colors.primary : Constants.Colors.secondaryBackground)
+            .cornerRadius(Constants.CornerRadius.small)
         }
     }
 }

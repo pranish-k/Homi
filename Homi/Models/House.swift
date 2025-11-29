@@ -56,7 +56,9 @@ struct House: Codable, Identifiable {
             self.settings = HouseSettings(
                 quietHoursStart: settingsData["quietHoursStart"] as? String,
                 quietHoursEnd: settingsData["quietHoursEnd"] as? String,
-                currency: settingsData["currency"] as? String ?? "USD"
+                currency: settingsData["currency"] as? String ?? "USD",
+                requirePaymentConfirmation: settingsData["requirePaymentConfirmation"] as? Bool ?? false,
+                autoConfirmAfterHours: settingsData["autoConfirmAfterHours"] as? Int ?? 48
             )
         } else {
             self.settings = HouseSettings()
@@ -75,7 +77,9 @@ struct House: Codable, Identifiable {
 
         // Build settings dictionary
         var settingsDict: [String: Any] = [
-            "currency": settings.currency
+            "currency": settings.currency,
+            "requirePaymentConfirmation": settings.requirePaymentConfirmation,
+            "autoConfirmAfterHours": settings.autoConfirmAfterHours
         ]
 
         if let quietHoursStart = settings.quietHoursStart {
@@ -100,15 +104,26 @@ struct HouseSettings: Codable {
     var quietHoursStart: String?
     var quietHoursEnd: String?
     var currency: String
+    var requirePaymentConfirmation: Bool  // Default: OFF (trusted roommates)
+    var autoConfirmAfterHours: Int  // Auto-confirm pending payments after this time
 
     init(
         quietHoursStart: String? = nil,
         quietHoursEnd: String? = nil,
-        currency: String = "USD"
+        currency: String = "USD",
+        requirePaymentConfirmation: Bool = false,
+        autoConfirmAfterHours: Int = 48
     ) {
         self.quietHoursStart = quietHoursStart
         self.quietHoursEnd = quietHoursEnd
         self.currency = currency
+        self.requirePaymentConfirmation = requirePaymentConfirmation
+        self.autoConfirmAfterHours = autoConfirmAfterHours
+    }
+
+    // Computed property
+    var autoConfirmEnabled: Bool {
+        return requirePaymentConfirmation && autoConfirmAfterHours > 0
     }
 }
 

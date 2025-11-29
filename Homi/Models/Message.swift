@@ -120,6 +120,31 @@ struct Message: Identifiable, Codable {
         formatter.dateFormat = "MMM d, h:mm a"
         return formatter.string(from: timestamp)
     }
+
+    // Format date for section headers
+    var sectionDateText: String {
+        let calendar = Calendar.current
+        let formatter = DateFormatter()
+
+        if calendar.isDateInToday(timestamp) {
+            return "Today"
+        } else if calendar.isDateInYesterday(timestamp) {
+            return "Yesterday"
+        } else if calendar.isDate(timestamp, equalTo: Date(), toGranularity: .weekOfYear) {
+            formatter.dateFormat = "EEEE" // Day of week
+        } else if calendar.isDate(timestamp, equalTo: Date(), toGranularity: .year) {
+            formatter.dateFormat = "MMMM d" // Month and day
+        } else {
+            formatter.dateFormat = "MMMM d, yyyy" // Full date
+        }
+
+        return formatter.string(from: timestamp)
+    }
+
+    // Check if two messages are from the same day
+    func isSameDay(as other: Message) -> Bool {
+        Calendar.current.isDate(timestamp, inSameDayAs: other.timestamp)
+    }
 }
 
 // MARK: - Sample Data for Previews

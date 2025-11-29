@@ -178,7 +178,7 @@ class AuthViewModel: ObservableObject {
 
         do {
             try await authService.signInWithGoogle()
-
+ 
             // Check if profile needs setup
             if authService.userProfile?.displayName.isEmpty ?? true {
                 currentAuthStep = .profileSetup

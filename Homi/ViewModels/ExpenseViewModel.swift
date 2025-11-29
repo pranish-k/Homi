@@ -21,6 +21,7 @@ class ExpenseViewModel: ObservableObject {
     @Published var customSplits: [String: String] = [:] // userId: amount
 
     private let expenseService = ExpenseService.shared
+    private let centralStore = CentralExpenseStore.shared
     private let authService = AuthService.shared
     private var cancellables = Set<AnyCancellable>()
     private var currentHouseId: String?
@@ -30,19 +31,25 @@ class ExpenseViewModel: ObservableObject {
     }
 
     init() {
-        // Subscribe to expense service
-        expenseService.$expenses
+        setupSubscriptions()
+    }
+
+    private func setupSubscriptions() {
+        // Subscribe to central store for single source of truth
+        centralStore.$expenses
             .assign(to: &$expenses)
 
-        expenseService.$isLoading
+        centralStore.$balances
+            .assign(to: &$balances)
+
+        centralStore.$isLoading
             .assign(to: &$isLoading)
 
-        expenseService.$errorMessage
-            .sink { [weak self] error in
-                if let error = error {
-                    self?.errorMessage = error
-                    self?.showError = true
-                }
+        centralStore.$error
+            .compactMap { $0?.localizedDescription }
+            .sink { [weak self] errorMessage in
+                self?.errorMessage = errorMessage
+                self?.showError = true
             }
             .store(in: &cancellables)
     }
@@ -50,40 +57,24 @@ class ExpenseViewModel: ObservableObject {
     // MARK: - Lifecycle
 
     func startListening(houseId: String, houseMembers: [HouseMember]) {
-        currentHouseId = houseId
-        expenseService.startListeningToExpenses(houseId: houseId)
-        expenseService.startListeningToPayments(houseId: houseId)
+        guard let currentUserId = AuthService.shared.user?.uid else {
+            errorMessage = "User not authenticated"
+            showError = true
+            return
+        }
 
-        // Calculate balances whenever expenses change
-        // Use debounce to avoid recalculating on every single change
-        // Use removeDuplicates to skip if expenses array hasn't actually changed
-        expenseService.$expenses
-            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
-            .removeDuplicates(by: { oldExpenses, newExpenses in
-                // Only recalculate if the unsettled expenses have actually changed
-                let oldUnsettled = oldExpenses.filter { !$0.isSettled }
-                let newUnsettled = newExpenses.filter { !$0.isSettled }
-                return oldUnsettled.count == newUnsettled.count &&
-                       oldUnsettled.map(\.id).sorted() == newUnsettled.map(\.id).sorted()
-            })
-            .sink { [weak self] _ in
-                guard let self = self, let userId = self.currentUserId else { return }
-                // Perform calculation off the main thread, then update UI on main thread
-                Task.detached(priority: .userInitiated) {
-                    let balances = await self.expenseService.calculateBalances(
-                        currentUserId: userId,
-                        houseMembers: houseMembers
-                    )
-                    await MainActor.run {
-                        self.balances = balances
-                    }
-                }
-            }
-            .store(in: &cancellables)
+        currentHouseId = houseId
+
+        // Initialize central store (single listener for entire app)
+        centralStore.initialize(
+            houseId: houseId,
+            currentUserId: currentUserId,
+            houseMembers: houseMembers
+        )
     }
 
     func stopListening() {
-        expenseService.stopListening()
+        centralStore.stopListening()
     }
 
     // MARK: - Expense Operations

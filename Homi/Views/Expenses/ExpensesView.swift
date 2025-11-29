@@ -372,7 +372,8 @@ struct ExpensesView: View {
 
                 // Start listening to expenses and payments
                 viewModel.startListening(houseId: houseId, houseMembers: members)
-                ExpenseService.shared.startListeningToPayments(houseId: houseId)
+                // Payment listener is already started inside viewModel.startListening()
+                // Removing duplicate listener to prevent double payment recordings
 
                 // Load nudge states in background (non-blocking)
                 Task {
@@ -389,70 +390,50 @@ struct ExpensesView: View {
     private func loadNudgeStates() async {
         guard let currentUserId = authService.userProfile?.id else { return }
 
-        // Get all balances where money is owed to you
         let relevantBalances = viewModel.balances.filter { $0.netBalance > 0 }
+        let nudgeService = self.nudgeService
 
-        guard !relevantBalances.isEmpty else {
-            await MainActor.run {
-                nudgeStates = [:]
-            }
-            return
-        }
+        // Process all nudge states in parallel with caching
+        await withTaskGroup(of: (String, Bool, Date?).self) { group in
+            for balance in relevantBalances {
+                group.addTask {
+                    let itemId = "balance_\(balance.userId)"
 
-        // Process each balance individually with a timeout
-        for balance in relevantBalances {
-            // Run each nudge check in parallel with a timeout to prevent blocking
-            Task {
-                let itemId = "balance_\(balance.userId)"
+                    // Check cache first for performance
+                    if let cached = await ExpenseCacheService.shared.getCachedNudgeState(for: balance.userId) {
+                        return (balance.userId, cached.canNudge, cached.lastNudgeTime)
+                    }
 
-                // Use canSendNudge which has built-in caching and optimization
-                let canSend = await nudgeService.canSendNudge(
-                    fromUserId: currentUserId,
-                    toUserId: balance.userId,
-                    itemId: itemId
-                )
-
-                // Get last nudge time with timeout protection
-                let lastNudgeTime = await withTimeout(seconds: 2) {
-                    await self.getLastNudgeTimeCached(
+                    // Single query for nudge state (no duplicates)
+                    let canSend = await nudgeService.canSendNudge(
                         fromUserId: currentUserId,
                         toUserId: balance.userId,
                         itemId: itemId
                     )
-                }
 
+                    // Get last nudge time from service's internal cache
+                    let lastNudgeTime = await nudgeService.getLastNudgeTime(
+                        fromUserId: currentUserId,
+                        toUserId: balance.userId,
+                        itemId: itemId
+                    )
+
+                    // Cache the result for future use
+                    await ExpenseCacheService.shared.cacheNudgeState(
+                        (canNudge: canSend, lastNudgeTime: lastNudgeTime),
+                        for: balance.userId
+                    )
+
+                    return (balance.userId, canSend, lastNudgeTime)
+                }
+            }
+
+            // Collect all results and update state
+            for await (userId, canNudge, lastNudgeTime) in group {
                 await MainActor.run {
-                    self.nudgeStates[balance.userId] = (canNudge: canSend, lastNudgeTime: lastNudgeTime)
+                    self.nudgeStates[userId] = (canNudge: canNudge, lastNudgeTime: lastNudgeTime)
                 }
             }
-        }
-    }
-
-    private func getLastNudgeTimeCached(fromUserId: String, toUserId: String, itemId: String) async -> Date? {
-        // Get the most recent nudge with simpler query (uses existing index)
-        do {
-            let cutoffDate = Date().addingTimeInterval(-Nudge.cooldownHours * 3600)
-            let db = Firestore.firestore()
-
-            // Use a simpler query that doesn't require compound index
-            let snapshot = try await db.collection(Constants.Collections.nudges)
-                .whereField("fromUserId", isEqualTo: fromUserId)
-                .whereField("toUserId", isEqualTo: toUserId)
-                .whereField("itemId", isEqualTo: itemId)
-                .order(by: "timestamp", descending: true)
-                .limit(to: 1)
-                .getDocuments()
-
-            guard let doc = snapshot.documents.first,
-                  let nudge = Nudge.fromFirestore(doc.data()),
-                  nudge.timestamp > cutoffDate else {
-                return nil
-            }
-
-            return nudge.timestamp
-        } catch {
-            logger.error("Error fetching last nudge time: \(error.localizedDescription)")
-            return nil
         }
     }
 

@@ -145,6 +145,103 @@ struct ChoreCardView: View {
     }
 }
 
+// MARK: - Compact Chore Card (For Completed Chores)
+
+struct CompactChoreCardView: View {
+    let chore: Chore
+    let currentUserId: String
+    var onUncomplete: (() -> Void)?
+    var onDelete: (() -> Void)?
+
+    private var isAssignedToCurrentUser: Bool {
+        chore.assignedTo == currentUserId
+    }
+
+    var body: some View {
+        HomiCard(shadowStyle: .subtle) {
+            HStack(spacing: Constants.Spacing.small) {
+                // Category Icon (smaller)
+                ZStack {
+                    Circle()
+                        .fill(chore.category.color.opacity(0.15))
+                        .frame(width: 32, height: 32)
+
+                    Image(systemName: chore.category.icon)
+                        .font(.system(size: 14))
+                        .foregroundColor(chore.category.color)
+                }
+
+                // Title & Info
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(chore.title)
+                        .font(Constants.Typography.body)
+                        .foregroundColor(Constants.Colors.textPrimary)
+                        .lineLimit(1)
+
+                    HStack(spacing: Constants.Spacing.xSmall) {
+                        Text(chore.completedByName ?? chore.assignedToName)
+                            .font(Constants.Typography.caption2)
+                            .foregroundColor(Constants.Colors.textSecondary)
+
+                        Text("•")
+                            .font(Constants.Typography.caption2)
+                            .foregroundColor(Constants.Colors.textSecondary)
+
+                        if let completedAt = chore.completedAt {
+                            Text(formatCompletedDate(completedAt))
+                                .font(Constants.Typography.caption2)
+                                .foregroundColor(Constants.Colors.textSecondary)
+                        }
+                    }
+                }
+
+                Spacer()
+
+                // Done badge (no checkbox)
+                HomiBadge(
+                    "Done",
+                    icon: "checkmark",
+                    style: .success,
+                    size: .small
+                )
+            }
+            .padding(Constants.Spacing.small)
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            if isAssignedToCurrentUser {
+                Button {
+                    onUncomplete?()
+                } label: {
+                    Label("Undo", systemImage: "arrow.uturn.backward")
+                }
+                .tint(Constants.Colors.warning)
+            }
+        }
+        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+            if chore.createdBy == currentUserId {
+                Button(role: .destructive) {
+                    onDelete?()
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
+        }
+    }
+
+    private func formatCompletedDate(_ date: Date) -> String {
+        let calendar = Calendar.current
+        if calendar.isDateInToday(date) {
+            return "Today"
+        } else if calendar.isDateInYesterday(date) {
+            return "Yesterday"
+        } else {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "MMM d"
+            return formatter.string(from: date)
+        }
+    }
+}
+
 // MARK: - Preview
 
 #Preview {

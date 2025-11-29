@@ -147,7 +147,7 @@ struct ChangePasswordView: View {
         let credential = EmailAuthProvider.credential(withEmail: email, password: currentPassword)
 
         user.reauthenticate(with: credential) { _, error in
-            if let error = error {
+            if error != nil {
                 isLoading = false
                 errorMessage = "Current password is incorrect"
                 HapticManager.error()
@@ -175,3 +175,4 @@ struct ChangePasswordView: View {
 #Preview {
     ChangePasswordView()
 }
+ 

@@ -8,31 +8,78 @@ struct ThemeSelectionView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: Constants.Spacing.large) {
-                    // Description
-                    Text("Choose your preferred color theme. The theme will be applied throughout the app.")
-                        .font(Constants.Typography.subheadline)
-                        .foregroundColor(Constants.Colors.textSecondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, Constants.Spacing.screenPadding)
-                        .padding(.top, Constants.Spacing.medium)
+                    // Theme Mode Section
+                    VStack(alignment: .leading, spacing: Constants.Spacing.small) {
+                        Text("Theme Mode")
+                            .font(Constants.Typography.subheadline)
+                            .foregroundColor(Constants.Colors.textSecondary)
+                            .padding(.horizontal, Constants.Spacing.screenPadding)
 
-                    // Theme Options
-                    VStack(spacing: Constants.Spacing.medium) {
-                        ForEach(AppTheme.allThemes) { theme in
-                            ThemeOptionCard(
-                                theme: theme,
-                                isSelected: themeManager.currentTheme.id == theme.id,
-                                onSelect: {
-                                    themeManager.setTheme(theme)
-                                    HapticManager.selection()
+                        HomiCard(shadowStyle: .subtle) {
+                            VStack(spacing: 0) {
+                                ForEach(Array(ThemeMode.allCases.enumerated()), id: \.element) { index, mode in
+                                    Button(action: {
+                                        themeManager.setThemeMode(mode)
+                                        HapticManager.selection()
+                                    }) {
+                                        HStack(spacing: Constants.Spacing.medium) {
+                                            Image(systemName: mode == .light ? "sun.max.fill" : "moon.fill")
+                                                .font(.system(size: 20))
+                                                .foregroundColor(Constants.Colors.primary)
+                                                .frame(width: 28)
+
+                                            Text(mode.displayName)
+                                                .font(Constants.Typography.body)
+                                                .foregroundColor(Constants.Colors.textPrimary)
+
+                                            Spacer()
+
+                                            if themeManager.themeMode == mode {
+                                                Image(systemName: "checkmark.circle.fill")
+                                                    .font(.system(size: 20))
+                                                    .foregroundColor(Constants.Colors.primary)
+                                            }
+                                        }
+                                        .padding(Constants.Spacing.cardPadding)
+                                        .contentShape(Rectangle())
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+
+                                    if index < ThemeMode.allCases.count - 1 {
+                                        Divider()
+                                            .padding(.leading, Constants.Spacing.screenPadding + 44)
+                                    }
                                 }
-                            )
+                            }
                         }
+                        .padding(.horizontal, Constants.Spacing.screenPadding)
                     }
-                    .padding(.horizontal, Constants.Spacing.screenPadding)
+
+                    // Color Section
+                    VStack(alignment: .leading, spacing: Constants.Spacing.small) {
+                        Text("Color")
+                            .font(Constants.Typography.subheadline)
+                            .foregroundColor(Constants.Colors.textSecondary)
+                            .padding(.horizontal, Constants.Spacing.screenPadding)
+
+                        VStack(spacing: Constants.Spacing.medium) {
+                            ForEach(AppTheme.allThemes) { theme in
+                                ThemeOptionCard(
+                                    theme: theme,
+                                    isSelected: themeManager.currentTheme.id == theme.id,
+                                    onSelect: {
+                                        themeManager.setTheme(theme)
+                                        HapticManager.selection()
+                                    }
+                                )
+                            }
+                        }
+                        .padding(.horizontal, Constants.Spacing.screenPadding)
+                    }
 
                     Spacer()
                 }
+                .padding(.top, Constants.Spacing.medium)
             }
             .navigationTitle("Theme")
             .navigationBarTitleDisplayMode(.inline)

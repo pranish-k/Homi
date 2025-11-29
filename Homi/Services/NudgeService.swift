@@ -155,6 +155,28 @@ class NudgeService: ObservableObject {
         }
     }
 
+    // MARK: - Get Last Nudge Time
+
+    func getLastNudgeTime(
+        fromUserId: String,
+        toUserId: String,
+        itemId: String
+    ) async -> Date? {
+        do {
+            if let recentNudge = try await getRecentNudge(
+                fromUserId: fromUserId,
+                toUserId: toUserId,
+                itemId: itemId
+            ) {
+                return recentNudge.timestamp
+            }
+            return nil
+        } catch {
+            logger.error("Error getting last nudge time: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
     // MARK: - Get Time Until Next Nudge
 
     func timeUntilNextNudge(

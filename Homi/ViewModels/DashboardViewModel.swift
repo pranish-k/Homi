@@ -54,7 +54,9 @@ class DashboardViewModel: ObservableObject {
         expenseService.$expenses
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
-                self?.updateBalance()
+                Task {
+                    await self?.updateBalance()
+                }
             }
             .store(in: &cancellables)
 
@@ -117,15 +119,17 @@ class DashboardViewModel: ObservableObject {
             .map { $0 }
     }
 
-    private func updateBalance() {
+    private func updateBalance() async {
         guard let userId = authService.user?.uid else { return }
 
         // Calculate net balance (what you're owed - what you owe)
-        let balances = expenseService.calculateBalances(currentUserId: userId, houseMembers: houseMembers)
+        let balances = await expenseService.calculateBalances(currentUserId: userId, houseMembers: houseMembers)
 
         // Sum up all balances - positive means they owe you, negative means you owe them
-        myBalance = balances.reduce(into: 0.0) { result, balance in
-            result += balance.netBalance
+        await MainActor.run {
+            myBalance = balances.reduce(into: 0.0) { result, balance in
+                result += balance.netBalance
+            }
         }
     }
 
@@ -192,13 +196,13 @@ class DashboardViewModel: ObservableObject {
         }
 
         // Priority 2: Payment owed by user
-        guard let userId = authService.user?.uid else {
+        guard authService.user?.uid != nil else {
             return .allCaughtUp
         }
 
         if myBalance < 0 {
-            // Find who user owes the most
-            let balances = expenseService.calculateBalances(currentUserId: userId, houseMembers: houseMembers)
+            // Find who user owes the most using cached balances from central store
+            let balances = CentralExpenseStore.shared.balances
             if let maxDebt = balances.filter({ $0.netBalance < 0 }).max(by: { abs($0.netBalance) < abs($1.netBalance) }) {
                 return .overduePayment(amount: abs(maxDebt.netBalance), person: maxDebt.userName)
             }

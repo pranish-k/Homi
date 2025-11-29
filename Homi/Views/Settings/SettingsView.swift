@@ -11,6 +11,9 @@ struct SettingsView: View {
     @State private var showMyHouse = false
     @State private var showAdminPanel = false
     @State private var currentHouse: House?
+    @State private var showPrivacyPolicy = false
+    @State private var showTermsOfService = false
+    @State private var showDataPrivacy = false
 
     private var isHouseCreator: Bool {
         guard let userId = authService.userProfile?.id,
@@ -24,6 +27,17 @@ struct SettingsView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: Constants.Spacing.large) {
+                    // House Section (for all members) - FIRST
+                    if authService.userProfile?.currentHouseId != nil {
+                        SettingsSection(title: "House") {
+                            SettingsButton(
+                                icon: "house.fill",
+                                title: "My House",
+                                action: { showMyHouse = true }
+                            )
+                        }
+                    }
+
                     // Account Section
                     SettingsSection(title: "Account") {
                         if let user = authService.userProfile {
@@ -66,15 +80,39 @@ struct SettingsView: View {
                         )
                     }
 
-                    // House Section (for all members)
-                    if authService.userProfile?.currentHouseId != nil {
-                        SettingsSection(title: "House") {
-                            SettingsButton(
-                                icon: "house.fill",
-                                title: "My House",
-                                action: { showMyHouse = true }
-                            )
-                        }
+                    // Legal Section
+                    SettingsSection(title: "Legal") {
+                        SettingsButton(
+                            icon: "lock.shield",
+                            title: "Privacy Policy",
+                            action: {
+                                if let url = URL(string: LegalDocuments.privacyPolicyURL),
+                                   UIApplication.shared.canOpenURL(url) {
+                                    UIApplication.shared.open(url)
+                                } else {
+                                    showPrivacyPolicy = true
+                                }
+                            }
+                        )
+
+                        SettingsButton(
+                            icon: "doc.text",
+                            title: "Terms of Service",
+                            action: {
+                                if let url = URL(string: LegalDocuments.termsOfServiceURL),
+                                   UIApplication.shared.canOpenURL(url) {
+                                    UIApplication.shared.open(url)
+                                } else {
+                                    showTermsOfService = true
+                                }
+                            }
+                        )
+
+                        SettingsButton(
+                            icon: "hand.raised",
+                            title: "Data & Privacy",
+                            action: { showDataPrivacy = true }
+                        )
                     }
 
                     // About Section
@@ -124,6 +162,43 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showAdminPanel) {
                 AdminPanelView(house: $currentHouse)
+            }
+            .sheet(isPresented: $showPrivacyPolicy) {
+                NavigationStack {
+                    ScrollView {
+                        Text(LegalDocuments.privacyPolicy)
+                            .padding()
+                    }
+                    .navigationTitle("Privacy Policy")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            Button("Done") {
+                                showPrivacyPolicy = false
+                            }
+                        }
+                    }
+                }
+            }
+            .sheet(isPresented: $showTermsOfService) {
+                NavigationStack {
+                    ScrollView {
+                        Text(LegalDocuments.termsOfService)
+                            .padding()
+                    }
+                    .navigationTitle("Terms of Service")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            Button("Done") {
+                                showTermsOfService = false
+                            }
+                        }
+                    }
+                }
+            }
+            .sheet(isPresented: $showDataPrivacy) {
+                DataPrivacyView()
             }
             .task {
                 await loadHouse()

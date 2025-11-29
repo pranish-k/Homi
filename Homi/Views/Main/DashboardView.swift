@@ -11,6 +11,7 @@ struct DashboardView: View {
 
     @State private var showSettings = false
     @State private var showNotifications = false
+    @State private var showMyHouse = false
 
     private let logger = Logger(subsystem: "com.homi.app", category: "DashboardView")
 
@@ -76,6 +77,9 @@ struct DashboardView: View {
             .sheet(isPresented: $showNotifications) {
                 NotificationView()
             }
+            .sheet(isPresented: $showMyHouse) {
+                MyHouseView()
+            }
         }
         .task {
             await viewModel.loadData()
@@ -111,17 +115,18 @@ struct DashboardView: View {
 
     private var contentView: some View {
         VStack(spacing: Constants.Spacing.sectionSpacing) {
-            // House Header Card
+            // House Header Card (Clickable)
             if let house = viewModel.currentHouse {
                 HouseHeaderCard(
                     house: house,
                     members: viewModel.houseMembers,
-                    onShareInvite: viewModel.shareInvite
+                    onShareInvite: viewModel.shareInvite,
+                    onTapHouse: { showMyHouse = true }
                 )
                 .padding(.horizontal, Constants.Spacing.screenPadding)
             }
 
-            // 2x2 Quick Stats Grid
+            // Balance and Chores Combined
             QuickStatsGrid(viewModel: viewModel, selectedTab: $selectedTab)
                 .padding(.horizontal, Constants.Spacing.screenPadding)
 
@@ -157,56 +162,64 @@ struct HouseHeaderCard: View {
     let house: House
     let members: [HouseMember]
     let onShareInvite: () -> Void
+    let onTapHouse: () -> Void
 
     var body: some View {
-        HomiCard(shadowStyle: .subtle) {
-            VStack(spacing: Constants.Spacing.medium) {
-                // Header
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(house.name)
-                            .font(Constants.Typography.title2)
+        Button(action: onTapHouse) {
+            HomiCard(shadowStyle: .subtle) {
+                VStack(spacing: Constants.Spacing.medium) {
+                    // Header
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(house.name)
+                                .font(Constants.Typography.title2)
+                                .foregroundColor(Constants.Colors.textPrimary)
 
-                        if let address = house.address {
-                            Text(address)
-                                .font(Constants.Typography.caption1)
-                                .foregroundColor(Constants.Colors.textSecondary)
+                            if let address = house.address {
+                                Text(address)
+                                    .font(Constants.Typography.caption1)
+                                    .foregroundColor(Constants.Colors.textSecondary)
+                            }
                         }
+
+                        Spacer()
+
+                        // Invite Button
+                        Button(action: {
+                            onShareInvite()
+                        }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "person.badge.plus")
+                                    .font(.system(size: 14))
+
+                                Text("Invite")
+                                    .font(Constants.Typography.subheadline)
+                                    .fontWeight(.medium)
+                            }
+                            .foregroundColor(Constants.Colors.primary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Constants.Colors.primaryLight)
+                            .cornerRadius(Constants.CornerRadius.small)
+                        }
+                        .buttonStyle(PlainButtonStyle())
                     }
 
-                    Spacer()
-
-                    // Invite Button
-                    Button(action: onShareInvite) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "person.badge.plus")
-                                .font(.system(size: 14))
-
-                            Text("Invite")
-                                .font(Constants.Typography.subheadline)
-                                .fontWeight(.medium)
-                        }
-                        .foregroundColor(Constants.Colors.primary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(Constants.Colors.primaryLight)
-                        .cornerRadius(Constants.CornerRadius.small)
-                    }
-                }
-
-                // Members
-                if !members.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: Constants.Spacing.small) {
-                            ForEach(members) { member in
-                                MemberAvatarView(member: member)
+                    // Members
+                    if !members.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: Constants.Spacing.small) {
+                                ForEach(members) { member in
+                                    MemberAvatarView(member: member)
+                                }
                             }
                         }
                     }
                 }
+                .padding(Constants.Spacing.cardPadding)
             }
-            .padding(Constants.Spacing.cardPadding)
         }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 
@@ -258,8 +271,8 @@ struct QuickStatsGrid: View {
     @Binding var selectedTab: Int
 
     var body: some View {
-        VStack(spacing: Constants.Spacing.small) {
-            // Balance card - full width
+        // Balance and Chores side by side in a box
+        HStack(spacing: Constants.Spacing.small) {
             QuickStatCard(
                 icon: "dollarsign.circle.fill",
                 title: "Balance",
@@ -268,24 +281,13 @@ struct QuickStatsGrid: View {
                 onTap: { selectedTab = 2 }
             )
 
-            // Chores and Messages - side by side
-            HStack(spacing: Constants.Spacing.small) {
-                QuickStatCard(
-                    icon: "checklist",
-                    title: "Chores",
-                    value: "\(viewModel.dueTodayChoresCount)",
-                    color: viewModel.dueTodayChoresCount > 0 ? Constants.Colors.warning : Constants.Colors.textSecondary,
-                    onTap: { selectedTab = 4 }
-                )
-
-                QuickStatCard(
-                    icon: "message.fill",
-                    title: "Messages",
-                    value: "\(viewModel.unreadMessagesCount)",
-                    color: viewModel.unreadMessagesCount > 0 ? Constants.Colors.primary : Constants.Colors.textSecondary,
-                    onTap: { selectedTab = 1 }
-                )
-            }
+            QuickStatCard(
+                icon: "checklist",
+                title: "Chores",
+                value: "\(viewModel.dueTodayChoresCount)",
+                color: viewModel.dueTodayChoresCount > 0 ? Constants.Colors.warning : Constants.Colors.textSecondary,
+                onTap: { selectedTab = 4 }
+            )
         }
     }
 }
