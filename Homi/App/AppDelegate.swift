@@ -2,6 +2,7 @@ import SwiftUI
 import FirebaseCore
 import FirebaseAuth
 import FirebaseCrashlytics
+import GoogleSignIn
 // import FirebasePerformance // Uncomment after adding to Package.swift
 
 class AppDelegate: NSObject, UIApplicationDelegate {
@@ -80,12 +81,16 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ app: UIApplication,
                      open url: URL,
                      options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
+        // Handle Google Sign-In callback
+        if GIDSignIn.sharedInstance.handle(url) {
+            return true
+        }
+        
         // Handle Firebase Auth reCAPTCHA callback for phone authentication
         if Auth.auth().canHandle(url) {
             return true
         }
         
-        // Handle other URL schemes (Google Sign-In, etc.) here when implemented
         return false
     }
 }

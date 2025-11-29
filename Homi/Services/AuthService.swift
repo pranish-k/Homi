@@ -2,8 +2,10 @@ import Foundation
 import Combine
 import FirebaseAuth
 import FirebaseFirestore
+import FirebaseCore
 import AuthenticationServices
 import CryptoKit
+import GoogleSignIn
 import OSLog
 
 @MainActor
@@ -295,21 +297,79 @@ class AuthService: NSObject, ObservableObject {
 
     // MARK: - Google Sign In
 
-    func signInWithGoogle(presenting: UIViewController? = nil) async throws {
+    func signInWithGoogle() async throws {
         // Get the client ID from GoogleService-Info.plist
         guard let clientID = FirebaseApp.app()?.options.clientID else {
             logger.error("Google Sign-In: Missing client ID")
             throw AuthError.configurationError("Missing Google client ID")
         }
         
-        // For now, show a user-friendly message that Google Sign-In setup is in progress
-        // To fully implement, you need to:
-        // 1. Add GoogleSignIn SDK via SPM: https://github.com/google/GoogleSignIn-iOS
-        // 2. Add URL scheme for Google Sign-In in Info.plist
-        // 3. Implement the sign-in flow using GIDSignIn
+        // Get the root view controller
+        guard let windowScene = await UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let rootViewController = await windowScene.windows.first?.rootViewController else {
+            logger.error("Google Sign-In: No root view controller")
+            throw AuthError.configurationError("Unable to get root view controller")
+        }
         
-        logger.info("Google Sign-In requested with client ID: \(clientID)")
-        throw AuthError.notImplemented
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            // Create Google Sign-In configuration
+            let config = GIDConfiguration(clientID: clientID)
+            GIDSignIn.sharedInstance.configuration = config
+            
+            // Perform sign-in on main thread
+            let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: rootViewController)
+            
+            guard let idToken = result.user.idToken?.tokenString else {
+                throw AuthError.missingToken
+            }
+            
+            let accessToken = result.user.accessToken.tokenString
+            
+            // Create Firebase credential
+            let credential = GoogleAuthProvider.credential(withIDToken: idToken, accessToken: accessToken)
+            
+            // Sign in to Firebase
+            let authResult = try await auth.signIn(with: credential)
+            logger.info("Google Sign-In successful for user: \(authResult.user.uid)")
+            
+            // Check if user profile exists
+            let userDoc = try await db.collection(Constants.Collections.users)
+                .document(authResult.user.uid)
+                .getDocument()
+            
+            if !userDoc.exists {
+                // Create new user profile
+                let displayName = result.user.profile?.name ?? authResult.user.displayName ?? ""
+                let email = result.user.profile?.email ?? authResult.user.email
+                
+                let newUser = User(
+                    id: authResult.user.uid,
+                    email: email,
+                    displayName: displayName,
+                    profilePhotoUrl: result.user.profile?.imageURL(withDimension: 200)?.absoluteString,
+                    authProviders: ["google.com"]
+                )
+                
+                try await createUserProfile(user: newUser)
+            } else {
+                await fetchUserProfile(userId: authResult.user.uid)
+            }
+            
+            isLoading = false
+        } catch let error as GIDSignInError where error.code == .canceled {
+            isLoading = false
+            logger.info("Google Sign-In cancelled by user")
+            // Don't throw for user cancellation
+            return
+        } catch {
+            isLoading = false
+            logger.error("Google Sign-In error: \(error.localizedDescription)")
+            errorMessage = error.localizedDescription
+            throw error
+        }
     }
 
     // MARK: - User Profile Management

@@ -186,11 +186,12 @@ class AuthViewModel: ObservableObject {
                 currentAuthStep = .complete
             }
         } catch {
-            if case AuthError.notImplemented = error {
-                errorMessage = "Google Sign-In will be available soon"
-            } else {
-                errorMessage = error.localizedDescription
+            // Don't show error if user cancelled
+            if (error as NSError).code == -5 { // GIDSignInError.canceled
+                isLoading = false
+                return
             }
+            errorMessage = error.localizedDescription
             showError = true
         }
 
