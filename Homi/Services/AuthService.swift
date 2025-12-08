@@ -125,19 +125,25 @@ class AuthService: NSObject, ObservableObject {
     // MARK: - Phone Authentication
 
     func sendVerificationCode(phoneNumber: String) async throws -> String {
+        logger.info("📱 AuthService: Sending verification code to \(phoneNumber)")
+        print("📱 AuthService: Sending verification code to \(phoneNumber)")
+        
         isLoading = true
         errorMessage = nil
 
         do {
             // Note: For simulator testing, add test phone numbers in Firebase Console
             // Example: +15551234567 with verification code: 123456
+            print("📱 AuthService: Calling PhoneAuthProvider.verifyPhoneNumber...")
             let verificationID = try await PhoneAuthProvider.provider().verifyPhoneNumber(phoneNumber, uiDelegate: nil)
+            print("📱 AuthService: Got verificationID: \(verificationID.prefix(10))...")
             isLoading = false
             return verificationID
         } catch {
             isLoading = false
             errorMessage = "Phone authentication error: \(error.localizedDescription)"
-            logger.error("Phone auth error: \(error.localizedDescription)")
+            logger.error("📱 AuthService: Phone auth error: \(error.localizedDescription)")
+            print("📱 AuthService: Phone auth error: \(error)")
             throw error
         }
     }

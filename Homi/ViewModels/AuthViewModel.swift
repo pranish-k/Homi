@@ -84,16 +84,25 @@ class AuthViewModel: ObservableObject {
     // MARK: - Phone Authentication
 
     func sendPhoneVerification() async {
-        guard validatePhoneNumber() else { return }
+        print("📱 Phone auth: Starting verification for \(countryCode)\(phoneNumber)")
+        
+        guard validatePhoneNumber() else {
+            print("📱 Phone auth: Validation failed")
+            return
+        }
 
+        print("📱 Phone auth: Validation passed, sending code...")
         isLoading = true
         errorMessage = nil
 
         do {
             let fullPhoneNumber = "\(countryCode)\(phoneNumber)"
+            print("📱 Phone auth: Calling Firebase with number: \(fullPhoneNumber)")
             verificationID = try await authService.sendVerificationCode(phoneNumber: fullPhoneNumber)
+            print("📱 Phone auth: Verification ID received, moving to code entry")
             currentAuthStep = .phoneVerification
         } catch {
+            print("📱 Phone auth: Error - \(error.localizedDescription)")
             errorMessage = error.localizedDescription
             showError = true
         }
@@ -294,14 +303,17 @@ class AuthViewModel: ObservableObject {
 
     private func validatePhoneNumber() -> Bool {
         let cleanedNumber = phoneNumber.replacingOccurrences(of: "[^0-9]", with: "", options: .regularExpression)
+        print("📱 Phone validation: Input='\(phoneNumber)' Cleaned='\(cleanedNumber)' Length=\(cleanedNumber.count) Required=\(Constants.Validation.phoneNumberLength)")
 
         if cleanedNumber.count != Constants.Validation.phoneNumberLength {
+            print("📱 Phone validation: FAILED - wrong length")
             errorMessage = Constants.ErrorMessages.invalidPhoneNumber
             showError = true
             return false
         }
 
         phoneNumber = cleanedNumber
+        print("📱 Phone validation: PASSED")
         return true
     }
 
