@@ -2,6 +2,8 @@
 
 A comprehensive iOS roommate management app built with SwiftUI and Firebase. Homi helps households manage shared expenses, chores, communication, and coordination in one place.
 
+> **Later versions:** HOMI has since been rebuilt on an owned backend with an Expo mobile client in [homi-v3](https://github.com/pranish-k/homi-v3).
+
 ## Features
 
 <img src="https://github.com/user-attachments/assets/14e236fe-6613-4da3-82f8-b3b351814298" width="250" alt="Home Screen">
